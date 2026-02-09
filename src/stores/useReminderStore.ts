@@ -6,7 +6,6 @@ export interface Reminder {
   title: string
   description?: string
   type: 'deadline' | 'meeting' | 'milestone' | 'task' | 'other'
-  priority: 'high' | 'medium' | 'low'
   dueDate: Date
   projectId?: string
   isCompleted: boolean
@@ -41,7 +40,6 @@ export const useReminderStore = create<ReminderState>()(devtools(
         title: '项目A里程碑检查',
         description: '检查项目A第一阶段的完成情况',
         type: 'milestone',
-        priority: 'high',
         dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2天后
         projectId: '1',
         isCompleted: false,
@@ -54,7 +52,6 @@ export const useReminderStore = create<ReminderState>()(devtools(
         title: '团队周会',
         description: '每周例行团队会议',
         type: 'meeting',
-        priority: 'medium',
         dueDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000), // 1天后
         isCompleted: false,
         isRead: true,
@@ -66,7 +63,6 @@ export const useReminderStore = create<ReminderState>()(devtools(
         title: '项目B交付截止',
         description: '项目B最终版本交付',
         type: 'deadline',
-        priority: 'high',
         dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5天后
         projectId: '2',
         isCompleted: false,

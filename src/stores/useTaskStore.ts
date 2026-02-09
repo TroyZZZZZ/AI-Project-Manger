@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
-import { Task, TaskStatus, TaskPriority } from '../types'
+import { Task } from '../types'
 import { TaskService } from '../services/taskService'
 
 interface TaskState {
@@ -9,11 +9,9 @@ interface TaskState {
   loading: boolean
   error: string | null
   searchQuery: string
-  statusFilter: TaskStatus | 'all'
-  priorityFilter: TaskPriority | 'all'
   projectFilter: string | 'all'
   assigneeFilter: string | 'all'
-  sortBy: 'name' | 'created_at' | 'updated_at' | 'deadline' | 'priority'
+  sortBy: 'name' | 'created_at' | 'updated_at' | 'deadline'
   sortOrder: 'asc' | 'desc'
   pagination: {
     page: number
@@ -31,23 +29,20 @@ interface TaskState {
 
 interface TaskActions {
   // 数据获取
-  fetchTasks: (projectId?: string) => Promise<void>
-  fetchTaskById: (id: string) => Promise<void>
-  fetchTaskStatistics: (projectId?: string) => Promise<void>
+  fetchTasks: (projectId?: number) => Promise<void>
+  fetchTaskById: (id: number) => Promise<void>
+  fetchTaskStatistics: (projectId?: number) => Promise<void>
   fetchOverdueTasks: () => Promise<void>
   fetchUpcomingTasks: (days?: number) => Promise<void>
   
   // 任务操作
   createTask: (task: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => Promise<void>
-  updateTask: (id: string, updates: Partial<Task>) => Promise<void>
-  deleteTask: (id: string) => Promise<void>
-  updateTaskStatus: (id: string, status: TaskStatus) => Promise<void>
-  updateTaskProgress: (id: string, progress: number) => Promise<void>
-  logWorkHours: (id: string, hours: number, description?: string) => Promise<void>
+  updateTask: (id: number, updates: Partial<Task>) => Promise<void>
+  deleteTask: (id: number) => Promise<void>
+  logWorkHours: (id: number, hours: number, description?: string) => Promise<void>
   
   // 批量操作
-  batchUpdateStatus: (taskIds: string[], status: TaskStatus) => Promise<void>
-  batchDelete: (taskIds: string[]) => Promise<void>
+  batchDelete: (taskIds: number[]) => Promise<void>
   
   // 状态管理
   setCurrentTask: (task: Task | null) => void
@@ -56,8 +51,6 @@ interface TaskActions {
   
   // 筛选和搜索
   setSearchQuery: (query: string) => void
-  setStatusFilter: (status: TaskStatus | 'all') => void
-  setPriorityFilter: (priority: TaskPriority | 'all') => void
   setProjectFilter: (projectId: string | 'all') => void
   setAssigneeFilter: (assigneeId: string | 'all') => void
   setSortBy: (sortBy: TaskState['sortBy']) => void
@@ -80,8 +73,6 @@ const initialState: TaskState = {
   loading: false,
   error: null,
   searchQuery: '',
-  statusFilter: 'all',
-  priorityFilter: 'all',
   projectFilter: 'all',
   assigneeFilter: 'all',
   sortBy: 'updated_at',
@@ -100,282 +91,203 @@ const initialState: TaskState = {
   }
 }
 
-export const useTaskStore = create<TaskStore>()()
+export const useTaskStore = create<TaskStore>()(
   devtools(
     persist(
       (set, get) => ({
         ...initialState,
         
         // 数据获取
-        fetchTasks: async (projectId?: string) => {
+        fetchTasks: async (projectId?: number) => {
           const state = get()
           set({ loading: true, error: null })
           
           try {
-            const filters = {
+            const params = {
+              page: state.pagination.page,
+              limit: state.pagination.limit,
               search: state.searchQuery || undefined,
-              status: state.statusFilter !== 'all' ? state.statusFilter : undefined,
-              priority: state.priorityFilter !== 'all' ? state.priorityFilter : undefined,
-              project_id: projectId || (state.projectFilter !== 'all' ? state.projectFilter : undefined),
-              assignee_id: state.assigneeFilter !== 'all' ? state.assigneeFilter : undefined
+              project_id: projectId || (state.projectFilter !== 'all' ? Number(state.projectFilter) : undefined),
+              sort_by: state.sortBy,
+              sort_order: state.sortOrder
             }
             
-            const result = await TaskService.getTasks(
-              filters,
-              state.pagination.page,
-              state.pagination.limit,
-              state.sortBy,
-              state.sortOrder
-            )
-            
-            set({
-              tasks: result.data,
+            const response = await TaskService.getTasks(params)
+            set({ 
+              tasks: response.data,
               pagination: {
                 ...state.pagination,
-                total: result.total
+                total: response.pagination?.total || response.data.length
               },
-              loading: false
+              loading: false 
             })
           } catch (error) {
-            set({
+            set({ 
               error: error instanceof Error ? error.message : '获取任务列表失败',
-              loading: false
+              loading: false 
             })
           }
         },
         
-        fetchTaskById: async (id: string) => {
+        fetchTaskById: async (id: number) => {
           set({ loading: true, error: null })
-          
           try {
             const task = await TaskService.getTaskById(id)
             set({ currentTask: task, loading: false })
           } catch (error) {
-            set({
+            set({ 
               error: error instanceof Error ? error.message : '获取任务详情失败',
-              loading: false
+              loading: false 
             })
           }
         },
         
-        fetchTaskStatistics: async (projectId?: string) => {
+        fetchTaskStatistics: async (projectId?: number) => {
+          set({ loading: true, error: null })
           try {
-            const stats = await TaskService.getTaskStatistics(projectId)
-            set({ statistics: stats })
+            if (projectId) {
+              const stats = await TaskService.getProjectTaskStats(projectId)
+              set({ 
+                statistics: {
+                  total: stats.total,
+                  completed: stats.byStatus['completed'] || 0,
+                  in_progress: stats.byStatus['in_progress'] || 0,
+                  pending: stats.byStatus['todo'] || 0,
+                  overdue: 0 // 需要单独计算
+                },
+                loading: false 
+              })
+            } else {
+              set({ loading: false })
+            }
           } catch (error) {
-            console.error('获取任务统计失败:', error)
+            set({ 
+              error: error instanceof Error ? error.message : '获取任务统计失败',
+              loading: false 
+            })
           }
         },
         
         fetchOverdueTasks: async () => {
           set({ loading: true, error: null })
-          
           try {
-            const overdueTasks = await TaskService.getOverdueTasks()
-            set({ tasks: overdueTasks, loading: false })
+            const tasks = await TaskService.getOverdueTasks() // 移除多余的参数
+            set({ tasks, loading: false })
           } catch (error) {
-            set({
+            set({ 
               error: error instanceof Error ? error.message : '获取逾期任务失败',
-              loading: false
+              loading: false 
             })
           }
         },
         
         fetchUpcomingTasks: async (days = 7) => {
           set({ loading: true, error: null })
-          
           try {
-            const upcomingTasks = await TaskService.getUpcomingTasks(days)
-            set({ tasks: upcomingTasks, loading: false })
+            const tasks = await TaskService.getUpcomingTasks(days) // 移除多余的用户ID参数
+            set({ tasks, loading: false })
           } catch (error) {
-            set({
+            set({ 
               error: error instanceof Error ? error.message : '获取即将到期任务失败',
-              loading: false
+              loading: false 
             })
           }
         },
         
-        // 任务操作
+        // 数据操作
         createTask: async (taskData) => {
           set({ loading: true, error: null })
-          
           try {
             const newTask = await TaskService.createTask(taskData)
-            const state = get()
-            set({
+            set(state => ({ 
               tasks: [newTask, ...state.tasks],
-              loading: false
-            })
-            
-            // 更新统计数据
-            await get().fetchTaskStatistics(taskData.project_id)
+              loading: false 
+            }))
+            get().fetchTasks()
           } catch (error) {
-            set({
+            set({ 
               error: error instanceof Error ? error.message : '创建任务失败',
-              loading: false
+              loading: false 
             })
           }
         },
         
-        updateTask: async (id: string, updates: Partial<Task>) => {
+        updateTask: async (id: number, updates: Partial<Task>) => {
           set({ loading: true, error: null })
-          
           try {
             const updatedTask = await TaskService.updateTask(id, updates)
-            const state = get()
-            
-            set({
-              tasks: state.tasks.map(t => t.id === id ? updatedTask : t),
+            set(state => ({
+              tasks: state.tasks.map(task => 
+                task.id === id ? updatedTask : task
+              ),
               currentTask: state.currentTask?.id === id ? updatedTask : state.currentTask,
               loading: false
-            })
-            
-            // 更新统计数据
-            await get().fetchTaskStatistics(updatedTask.project_id)
+            }))
           } catch (error) {
-            set({
+            set({ 
               error: error instanceof Error ? error.message : '更新任务失败',
-              loading: false
+              loading: false 
             })
           }
         },
         
-        deleteTask: async (id: string) => {
+        deleteTask: async (id: number) => {
           set({ loading: true, error: null })
-          
           try {
-            const state = get()
-            const task = state.tasks.find(t => t.id === id)
-            
             await TaskService.deleteTask(id)
-            
-            set({
-              tasks: state.tasks.filter(t => t.id !== id),
+            set(state => ({
+              tasks: state.tasks.filter(task => task.id !== id),
               currentTask: state.currentTask?.id === id ? null : state.currentTask,
-              loading: false
-            })
-            
-            // 更新统计数据
-            if (task) {
-              await get().fetchTaskStatistics(task.project_id)
-            }
-          } catch (error) {
-            set({
-              error: error instanceof Error ? error.message : '删除任务失败',
-              loading: false
-            })
-          }
-        },
-        
-        updateTaskStatus: async (id: string, status: TaskStatus) => {
-          try {
-            await TaskService.updateTaskStatus(id, status)
-            const state = get()
-            const updatedTask = state.tasks.find(t => t.id === id)
-            
-            if (updatedTask) {
-              const newTask = { ...updatedTask, status }
-              set({
-                tasks: state.tasks.map(t => t.id === id ? newTask : t),
-                currentTask: state.currentTask?.id === id ? newTask : state.currentTask
-              })
-              
-              // 更新统计数据
-              await get().fetchTaskStatistics(newTask.project_id)
-            }
-          } catch (error) {
-            set({
-              error: error instanceof Error ? error.message : '更新任务状态失败'
-            })
-          }
-        },
-        
-        updateTaskProgress: async (id: string, progress: number) => {
-          try {
-            await TaskService.updateTaskProgress(id, progress)
-            const state = get()
-            const updatedTask = state.tasks.find(t => t.id === id)
-            
-            if (updatedTask) {
-              const newTask = { ...updatedTask, progress }
-              set({
-                tasks: state.tasks.map(t => t.id === id ? newTask : t),
-                currentTask: state.currentTask?.id === id ? newTask : state.currentTask
-              })
-            }
-          } catch (error) {
-            set({
-              error: error instanceof Error ? error.message : '更新任务进度失败'
-            })
-          }
-        },
-        
-        logWorkHours: async (id: string, hours: number, description?: string) => {
-          try {
-            await TaskService.logWorkHours(id, hours, description)
-            const state = get()
-            const task = state.tasks.find(t => t.id === id)
-            
-            if (task) {
-              const newTask = {
-                ...task,
-                actual_hours: (task.actual_hours || 0) + hours
+              loading: false,
+              pagination: {
+                ...state.pagination,
+                total: Math.max(0, state.pagination.total - 1)
               }
-              set({
-                tasks: state.tasks.map(t => t.id === id ? newTask : t),
-                currentTask: state.currentTask?.id === id ? newTask : state.currentTask
-              })
-            }
+            }))
           } catch (error) {
-            set({
-              error: error instanceof Error ? error.message : '记录工时失败'
+            set({ 
+              error: error instanceof Error ? error.message : '删除任务失败',
+              loading: false 
+            })
+          }
+        },
+        
+        logWorkHours: async (id: number, hours: number, description?: string) => {
+          set({ loading: true, error: null })
+          try {
+            const updatedTask = await TaskService.updateTaskHours(id, hours)
+            set(state => ({
+              tasks: state.tasks.map(task => 
+                task.id === id ? updatedTask : task
+              ),
+              currentTask: state.currentTask?.id === id ? updatedTask : state.currentTask,
+              loading: false
+            }))
+          } catch (error) {
+            set({ 
+              error: error instanceof Error ? error.message : '记录工时失败',
+              loading: false 
             })
           }
         },
         
         // 批量操作
-        batchUpdateStatus: async (taskIds: string[], status: TaskStatus) => {
+        batchDelete: async (taskIds: number[]) => {
           set({ loading: true, error: null })
-          
           try {
-            await TaskService.batchUpdateStatus(taskIds, status)
-            const state = get()
-            
-            set({
-              tasks: state.tasks.map(t => 
-                taskIds.includes(t.id) ? { ...t, status } : t
-              ),
-              loading: false
-            })
-            
-            // 更新统计数据
-            await get().fetchTaskStatistics()
+            await TaskService.batchDelete(taskIds)
+            set(state => ({
+              tasks: state.tasks.filter(task => !taskIds.includes(task.id)),
+              loading: false,
+              pagination: {
+                ...state.pagination,
+                total: Math.max(0, state.pagination.total - taskIds.length)
+              }
+            }))
           } catch (error) {
-            set({
-              error: error instanceof Error ? error.message : '批量更新状态失败',
-              loading: false
-            })
-          }
-        },
-        
-        batchDelete: async (taskIds: string[]) => {
-          set({ loading: true, error: null })
-          
-          try {
-            await Promise.all(taskIds.map(id => TaskService.deleteTask(id)))
-            const state = get()
-            
-            set({
-              tasks: state.tasks.filter(t => !taskIds.includes(t.id)),
-              loading: false
-            })
-            
-            // 更新统计数据
-            await get().fetchTaskStatistics()
-          } catch (error) {
-            set({
+            set({ 
               error: error instanceof Error ? error.message : '批量删除失败',
-              loading: false
+              loading: false 
             })
           }
         },
@@ -387,28 +299,17 @@ export const useTaskStore = create<TaskStore>()()
         
         // 筛选和搜索
         setSearchQuery: (query) => {
-          set({ searchQuery: query, pagination: { ...get().pagination, page: 1 } })
-          // 自动触发搜索
-          setTimeout(() => get().fetchTasks(), 300)
-        },
-        
-        setStatusFilter: (status) => {
-          set({ statusFilter: status, pagination: { ...get().pagination, page: 1 } })
-          get().fetchTasks()
-        },
-        
-        setPriorityFilter: (priority) => {
-          set({ priorityFilter: priority, pagination: { ...get().pagination, page: 1 } })
+          set({ searchQuery: query })
           get().fetchTasks()
         },
         
         setProjectFilter: (projectId) => {
-          set({ projectFilter: projectId, pagination: { ...get().pagination, page: 1 } })
+          set({ projectFilter: projectId })
           get().fetchTasks()
         },
         
         setAssigneeFilter: (assigneeId) => {
-          set({ assigneeFilter: assigneeId, pagination: { ...get().pagination, page: 1 } })
+          set({ assigneeFilter: assigneeId })
           get().fetchTasks()
         },
         
@@ -424,12 +325,12 @@ export const useTaskStore = create<TaskStore>()()
         
         // 分页
         setPage: (page) => {
-          set({ pagination: { ...get().pagination, page } })
+          set(state => ({ pagination: { ...state.pagination, page } }))
           get().fetchTasks()
         },
         
         setLimit: (limit) => {
-          set({ pagination: { ...get().pagination, limit, page: 1 } })
+          set(state => ({ pagination: { ...state.pagination, limit, page: 1 } }))
           get().fetchTasks()
         },
         
@@ -437,13 +338,10 @@ export const useTaskStore = create<TaskStore>()()
         resetFilters: () => {
           set({
             searchQuery: '',
-            statusFilter: 'all',
-            priorityFilter: 'all',
             projectFilter: 'all',
             assigneeFilter: 'all',
             sortBy: 'updated_at',
-            sortOrder: 'desc',
-            pagination: { ...get().pagination, page: 1 }
+            sortOrder: 'desc'
           })
           get().fetchTasks()
         },
@@ -454,8 +352,6 @@ export const useTaskStore = create<TaskStore>()()
         name: 'task-store',
         partialize: (state) => ({
           searchQuery: state.searchQuery,
-          statusFilter: state.statusFilter,
-          priorityFilter: state.priorityFilter,
           projectFilter: state.projectFilter,
           assigneeFilter: state.assigneeFilter,
           sortBy: state.sortBy,
@@ -468,3 +364,4 @@ export const useTaskStore = create<TaskStore>()()
       name: 'task-store'
     }
   )
+)

@@ -1,0 +1,8 @@
+{
+  "name": "测试项目",
+  "description": "这是一个测试项目",
+  "status": "planning",
+  "start_date": "2025-01-01",
+  "end_date": "2025-12-31",
+  "budget": 100000
+}

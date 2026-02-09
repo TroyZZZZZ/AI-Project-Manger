@@ -1,6 +1,5 @@
 const express = require('express');
 const { TaskService } = require('../services/taskService.cjs');
-const { authenticate, requireProjectMember } = require('../middleware/auth.cjs');
 const {
   validateTaskCreation,
   validateTaskUpdate,
@@ -14,13 +13,13 @@ const {
 const router = express.Router();
 
 // 获取任务列表
-router.get('/', authenticate, validatePagination, handleValidationErrors, async (req, res) => {
+router.get('/', validatePagination, handleValidationErrors, async (req, res) => {
   try {
     const {
       page = 1,
       limit = 10,
       project_id,
-      status,
+      projectId, // 支持前端发送的projectId参数
       priority,
       assigned_to,
       search,
@@ -28,27 +27,29 @@ router.get('/', authenticate, validatePagination, handleValidationErrors, async 
       sort_order = 'desc'
     } = req.query;
     
-    const userId = req.user.id;
+    // 统一处理项目ID参数（支持两种命名方式）
+    const finalProjectId = projectId || project_id;
     
-    // 如果指定了项目ID，检查用户是否有权限访问该项目
-    if (project_id) {
-      const { ProjectService } = require('../services/projectService.cjs');
-      const hasAccess = await ProjectService.isProjectMember(project_id, userId);
-      if (!hasAccess) {
-        return res.status(403).json({
-          success: false,
-          message: '没有权限访问该项目的任务'
-        });
-      }
-    }
+    const userId = 1; // 单用户系统，固定用户ID为1
+    
+    console.log('Route params:', {
+      userId,
+      projectId: finalProjectId,
+      originalProjectId: projectId,
+      originalProject_id: project_id,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      assignedTo: assigned_to,
+      search,
+      sortBy: sort_by,
+      sortOrder: sort_order
+    });
     
     const result = await TaskService.getTasks({
       userId,
-      projectId: project_id,
+      projectId: finalProjectId,
       page: parseInt(page),
       limit: parseInt(limit),
-      status,
-      priority,
       assignedTo: assigned_to,
       search,
       sortBy: sort_by,
@@ -75,22 +76,12 @@ router.get('/', authenticate, validatePagination, handleValidationErrors, async 
 });
 
 // 创建任务
-router.post('/', authenticate, validateTaskCreation, handleValidationErrors, async (req, res) => {
+router.post('/', validateTaskCreation, handleValidationErrors, async (req, res) => {
   try {
     const taskData = {
       ...req.body,
-      created_by: req.user.id
+      created_by: 1 // 单用户系统，固定用户ID为1
     };
-    
-    // 检查用户是否有权限在该项目中创建任务
-    const { ProjectService } = require('../services/projectService.cjs');
-    const hasAccess = await ProjectService.isProjectMember(taskData.project_id, req.user.id);
-    if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
-        message: '没有权限在该项目中创建任务'
-      });
-    }
     
     const task = await TaskService.createTask(taskData);
     
@@ -103,13 +94,6 @@ router.post('/', authenticate, validateTaskCreation, handleValidationErrors, asy
     console.error('创建任务失败:', error);
     
     if (error.message.includes('不存在')) {
-      return res.status(404).json({
-        success: false,
-        message: error.message
-      });
-    }
-    
-    if (error.message.includes('无效')) {
       return res.status(400).json({
         success: false,
         message: error.message
@@ -124,7 +108,7 @@ router.post('/', authenticate, validateTaskCreation, handleValidationErrors, asy
 });
 
 // 获取任务详情
-router.get('/:id', authenticate, validateId(), handleValidationErrors, async (req, res) => {
+router.get('/:id', validateId(), handleValidationErrors, async (req, res) => {
   try {
     const taskId = req.params.id;
     const task = await TaskService.getTaskById(taskId);
@@ -133,16 +117,6 @@ router.get('/:id', authenticate, validateId(), handleValidationErrors, async (re
       return res.status(404).json({
         success: false,
         message: '任务不存在'
-      });
-    }
-    
-    // 检查用户是否有权限访问该任务
-    const { ProjectService } = require('../services/projectService.cjs');
-    const hasAccess = await ProjectService.isProjectMember(task.project_id, req.user.id);
-    if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
-        message: '没有权限访问该任务'
       });
     }
     
@@ -160,12 +134,12 @@ router.get('/:id', authenticate, validateId(), handleValidationErrors, async (re
 });
 
 // 更新任务
-router.put('/:id', authenticate, validateId(), validateTaskUpdate, handleValidationErrors, async (req, res) => {
+router.put('/:id', validateId(), validateTaskUpdate, handleValidationErrors, async (req, res) => {
   try {
     const taskId = req.params.id;
     const updateData = req.body;
     
-    // 获取任务信息以检查权限
+    // 检查任务是否存在
     const existingTask = await TaskService.getTaskById(taskId);
     if (!existingTask) {
       return res.status(404).json({
@@ -174,17 +148,7 @@ router.put('/:id', authenticate, validateId(), validateTaskUpdate, handleValidat
       });
     }
     
-    // 检查用户是否有权限更新该任务
-    const { ProjectService } = require('../services/projectService.cjs');
-    const hasAccess = await ProjectService.isProjectMember(existingTask.project_id, req.user.id);
-    if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
-        message: '没有权限更新该任务'
-      });
-    }
-    
-    const task = await TaskService.updateTask(taskId, updateData, req.user.id);
+    const task = await TaskService.updateTask(taskId, updateData);
     
     res.json({
       success: true,
@@ -201,13 +165,6 @@ router.put('/:id', authenticate, validateId(), validateTaskUpdate, handleValidat
       });
     }
     
-    if (error.message.includes('无效')) {
-      return res.status(400).json({
-        success: false,
-        message: error.message
-      });
-    }
-    
     res.status(500).json({
       success: false,
       message: '更新任务失败'
@@ -216,28 +173,16 @@ router.put('/:id', authenticate, validateId(), validateTaskUpdate, handleValidat
 });
 
 // 删除任务
-router.delete('/:id', authenticate, validateId(), handleValidationErrors, async (req, res) => {
+router.delete('/:id', validateId(), handleValidationErrors, async (req, res) => {
   try {
     const taskId = req.params.id;
     
-    // 获取任务信息以检查权限
+    // 检查任务是否存在
     const task = await TaskService.getTaskById(taskId);
     if (!task) {
       return res.status(404).json({
         success: false,
         message: '任务不存在'
-      });
-    }
-    
-    // 检查用户是否有权限删除该任务（任务创建者或项目管理员）
-    const { ProjectService } = require('../services/projectService.cjs');
-    const isCreator = task.created_by === req.user.id;
-    const hasAdminAccess = await ProjectService.checkProjectPermission(task.project_id, req.user.id, ['admin', 'owner']);
-    
-    if (!isCreator && !hasAdminAccess) {
-      return res.status(403).json({
-        success: false,
-        message: '没有权限删除该任务'
       });
     }
     
@@ -249,14 +194,6 @@ router.delete('/:id', authenticate, validateId(), handleValidationErrors, async 
     });
   } catch (error) {
     console.error('删除任务失败:', error);
-    
-    if (error.message.includes('不存在')) {
-      return res.status(404).json({
-        success: false,
-        message: error.message
-      });
-    }
-    
     res.status(500).json({
       success: false,
       message: '删除任务失败'
@@ -264,20 +201,14 @@ router.delete('/:id', authenticate, validateId(), handleValidationErrors, async 
   }
 });
 
-// 更新任务状态
-router.put('/:id/status', authenticate, validateId(), handleValidationErrors, async (req, res) => {
+// 添加任务评论
+router.post('/:id/comments', validateId(), validateTaskComment, handleValidationErrors, async (req, res) => {
   try {
     const taskId = req.params.id;
-    const { status } = req.body;
+    const { content } = req.body;
+    const userId = 1; // 单用户系统，固定用户ID为1
     
-    if (!status || !['todo', 'in_progress', 'completed'].includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: '无效的任务状态'
-      });
-    }
-    
-    // 获取任务信息以检查权限
+    // 检查任务是否存在
     const task = await TaskService.getTaskById(taskId);
     if (!task) {
       return res.status(404).json({
@@ -286,97 +217,29 @@ router.put('/:id/status', authenticate, validateId(), handleValidationErrors, as
       });
     }
     
-    // 检查用户是否有权限更新该任务状态
-    const { ProjectService } = require('../services/projectService.cjs');
-    const hasAccess = await ProjectService.isProjectMember(task.project_id, req.user.id);
-    if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
-        message: '没有权限更新该任务状态'
-      });
-    }
+    const comment = await TaskService.addComment(taskId, userId, content);
     
-    const updatedTask = await TaskService.updateTaskStatus(taskId, status, req.user.id);
-    
-    res.json({
+    res.status(201).json({
       success: true,
-      message: '任务状态更新成功',
-      data: updatedTask
+      message: '评论添加成功',
+      data: comment
     });
   } catch (error) {
-    console.error('更新任务状态失败:', error);
+    console.error('添加任务评论失败:', error);
     res.status(500).json({
       success: false,
-      message: '更新任务状态失败'
-    });
-  }
-});
-
-// 更新任务工时
-router.put('/:id/hours', authenticate, validateId(), handleValidationErrors, async (req, res) => {
-  try {
-    const taskId = req.params.id;
-    const { estimated_hours, actual_hours } = req.body;
-    
-    if (estimated_hours !== undefined && (isNaN(estimated_hours) || estimated_hours < 0)) {
-      return res.status(400).json({
-        success: false,
-        message: '预估工时必须是非负数'
-      });
-    }
-    
-    if (actual_hours !== undefined && (isNaN(actual_hours) || actual_hours < 0)) {
-      return res.status(400).json({
-        success: false,
-        message: '实际工时必须是非负数'
-      });
-    }
-    
-    // 获取任务信息以检查权限
-    const task = await TaskService.getTaskById(taskId);
-    if (!task) {
-      return res.status(404).json({
-        success: false,
-        message: '任务不存在'
-      });
-    }
-    
-    // 检查用户是否有权限更新该任务工时
-    const { ProjectService } = require('../services/projectService.cjs');
-    const hasAccess = await ProjectService.isProjectMember(task.project_id, req.user.id);
-    if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
-        message: '没有权限更新该任务工时'
-      });
-    }
-    
-    const updatedTask = await TaskService.updateTaskHours(taskId, {
-      estimated_hours,
-      actual_hours
-    }, req.user.id);
-    
-    res.json({
-      success: true,
-      message: '任务工时更新成功',
-      data: updatedTask
-    });
-  } catch (error) {
-    console.error('更新任务工时失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '更新任务工时失败'
+      message: '添加任务评论失败'
     });
   }
 });
 
 // 获取任务评论
-router.get('/:id/comments', authenticate, validateId(), handleValidationErrors, async (req, res) => {
+router.get('/:id/comments', validateId(), handleValidationErrors, async (req, res) => {
   try {
     const taskId = req.params.id;
     const { page = 1, limit = 20 } = req.query;
     
-    // 获取任务信息以检查权限
+    // 检查任务是否存在
     const task = await TaskService.getTaskById(taskId);
     if (!task) {
       return res.status(404).json({
@@ -385,17 +248,7 @@ router.get('/:id/comments', authenticate, validateId(), handleValidationErrors, 
       });
     }
     
-    // 检查用户是否有权限访问该任务的评论
-    const { ProjectService } = require('../services/projectService.cjs');
-    const hasAccess = await ProjectService.isProjectMember(task.project_id, req.user.id);
-    if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
-        message: '没有权限访问该任务的评论'
-      });
-    }
-    
-    const result = await TaskService.getTaskComments(taskId, {
+    const result = await TaskService.getComments(taskId, {
       page: parseInt(page),
       limit: parseInt(limit)
     });
@@ -419,13 +272,14 @@ router.get('/:id/comments', authenticate, validateId(), handleValidationErrors, 
   }
 });
 
-// 添加任务评论
-router.post('/:id/comments', authenticate, validateId(), validateTaskComment, handleValidationErrors, async (req, res) => {
+// 更新评论
+router.put('/:id/comments/:commentId', validateId(), validateTaskComment, handleValidationErrors, async (req, res) => {
   try {
-    const taskId = req.params.id;
+    const { id: taskId, commentId } = req.params;
     const { content } = req.body;
+    const userId = 1; // 单用户系统，固定用户ID为1
     
-    // 获取任务信息以检查权限
+    // 检查任务是否存在
     const task = await TaskService.getTaskById(taskId);
     if (!task) {
       return res.status(404).json({
@@ -434,42 +288,44 @@ router.post('/:id/comments', authenticate, validateId(), validateTaskComment, ha
       });
     }
     
-    // 检查用户是否有权限添加评论
-    const { ProjectService } = require('../services/projectService.cjs');
-    const hasAccess = await ProjectService.isProjectMember(task.project_id, req.user.id);
-    if (!hasAccess) {
-      return res.status(403).json({
-        success: false,
-        message: '没有权限添加评论'
-      });
-    }
+    const comment = await TaskService.updateComment(commentId, userId, content);
     
-    const comment = await TaskService.addTaskComment(taskId, {
-      content,
-      user_id: req.user.id
-    });
-    
-    res.status(201).json({
+    res.json({
       success: true,
-      message: '评论添加成功',
+      message: '评论更新成功',
       data: comment
     });
   } catch (error) {
-    console.error('添加任务评论失败:', error);
+    console.error('更新任务评论失败:', error);
+    
+    if (error.message.includes('不存在')) {
+      return res.status(404).json({
+        success: false,
+        message: error.message
+      });
+    }
+    
+    if (error.message.includes('权限')) {
+      return res.status(403).json({
+        success: false,
+        message: error.message
+      });
+    }
+    
     res.status(500).json({
       success: false,
-      message: '添加任务评论失败'
+      message: '更新任务评论失败'
     });
   }
 });
 
-// 获取任务历史
-router.get('/:id/history', authenticate, validateId(), handleValidationErrors, async (req, res) => {
+// 删除评论
+router.delete('/:id/comments/:commentId', validateId(), handleValidationErrors, async (req, res) => {
   try {
-    const taskId = req.params.id;
-    const { page = 1, limit = 20 } = req.query;
+    const { id: taskId, commentId } = req.params;
+    const userId = 1; // 单用户系统，固定用户ID为1
     
-    // 获取任务信息以检查权限
+    // 检查任务是否存在
     const task = await TaskService.getTaskById(taskId);
     if (!task) {
       return res.status(404).json({
@@ -478,159 +334,32 @@ router.get('/:id/history', authenticate, validateId(), handleValidationErrors, a
       });
     }
     
-    // 检查用户是否有权限访问该任务的历史
-    const { ProjectService } = require('../services/projectService.cjs');
-    const hasAccess = await ProjectService.isProjectMember(task.project_id, req.user.id);
-    if (!hasAccess) {
+    await TaskService.deleteComment(commentId, userId);
+    
+    res.json({
+      success: true,
+      message: '评论删除成功'
+    });
+  } catch (error) {
+    console.error('删除任务评论失败:', error);
+    
+    if (error.message.includes('不存在')) {
+      return res.status(404).json({
+        success: false,
+        message: error.message
+      });
+    }
+    
+    if (error.message.includes('权限')) {
       return res.status(403).json({
         success: false,
-        message: '没有权限访问该任务的历史'
+        message: error.message
       });
     }
     
-    const result = await TaskService.getTaskHistory(taskId, {
-      page: parseInt(page),
-      limit: parseInt(limit)
-    });
-    
-    res.json({
-      success: true,
-      data: result.history,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: result.total,
-        pages: Math.ceil(result.total / parseInt(limit))
-      }
-    });
-  } catch (error) {
-    console.error('获取任务历史失败:', error);
     res.status(500).json({
       success: false,
-      message: '获取任务历史失败'
-    });
-  }
-});
-
-// 批量更新任务
-router.post('/batch-update', authenticate, validateBatchOperation, handleValidationErrors, async (req, res) => {
-  try {
-    const { task_ids, updates } = req.body;
-    
-    // 检查所有任务的权限
-    for (const taskId of task_ids) {
-      const task = await TaskService.getTaskById(taskId);
-      if (!task) {
-        return res.status(404).json({
-          success: false,
-          message: `任务 ${taskId} 不存在`
-        });
-      }
-      
-      const { ProjectService } = require('../services/projectService.cjs');
-      const hasAccess = await ProjectService.isProjectMember(task.project_id, req.user.id);
-      if (!hasAccess) {
-        return res.status(403).json({
-          success: false,
-          message: `没有权限更新任务 ${taskId}`
-        });
-      }
-    }
-    
-    const result = await TaskService.batchUpdateTasks(task_ids, updates, req.user.id);
-    
-    res.json({
-      success: true,
-      message: `成功更新 ${result.updated_count} 个任务`,
-      data: {
-        updated_count: result.updated_count,
-        failed_count: result.failed_count,
-        errors: result.errors
-      }
-    });
-  } catch (error) {
-    console.error('批量更新任务失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '批量更新任务失败'
-    });
-  }
-});
-
-// 获取我的任务
-router.get('/user/my-tasks', authenticate, validatePagination, handleValidationErrors, async (req, res) => {
-  try {
-    const {
-      page = 1,
-      limit = 10,
-      status,
-      priority,
-      project_id
-    } = req.query;
-    
-    const result = await TaskService.getUserTasks(req.user.id, {
-      page: parseInt(page),
-      limit: parseInt(limit),
-      status,
-      priority,
-      projectId: project_id
-    });
-    
-    res.json({
-      success: true,
-      data: result.tasks,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: result.total,
-        pages: Math.ceil(result.total / parseInt(limit))
-      }
-    });
-  } catch (error) {
-    console.error('获取我的任务失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '获取我的任务失败'
-    });
-  }
-});
-
-// 搜索任务
-router.get('/search/:keyword', authenticate, async (req, res) => {
-  try {
-    const { keyword } = req.params;
-    const { page = 1, limit = 10, project_id } = req.query;
-    
-    if (!keyword || keyword.trim().length < 2) {
-      return res.status(400).json({
-        success: false,
-        message: '搜索关键词至少需要2个字符'
-      });
-    }
-    
-    const result = await TaskService.searchTasks({
-      keyword: keyword.trim(),
-      userId: req.user.id,
-      projectId: project_id,
-      page: parseInt(page),
-      limit: parseInt(limit)
-    });
-    
-    res.json({
-      success: true,
-      data: result.tasks,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: result.total,
-        pages: Math.ceil(result.total / parseInt(limit))
-      }
-    });
-  } catch (error) {
-    console.error('搜索任务失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '搜索任务失败'
+      message: '删除任务评论失败'
     });
   }
 });

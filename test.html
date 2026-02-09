@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Subproject Tab</title>
+</head>
+<body>
+    <script>
+        // 模拟访问项目详情页面并点击子项目标签页
+        fetch('http://localhost:5173/projects/4')
+            .then(response => response.text())
+            .then(html => {
+                console.log('页面加载成功');
+                if (html.includes('子项目管理')) {
+                    console.log('✓ 找到子项目管理标签');
+                } else {
+                    console.log('✗ 未找到子项目管理标签');
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    </script>
+</body>
+</html>

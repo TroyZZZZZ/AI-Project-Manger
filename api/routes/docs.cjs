@@ -1,4 +1,7 @@
 const express = require('express');
+const swaggerJsdoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
+
 const router = express.Router();
 
 // API文档首页
@@ -9,135 +12,15 @@ router.get('/', (req, res) => {
     description: '基于阿里云服务的项目管理系统后端API接口文档',
     baseUrl: `${req.protocol}://${req.get('host')}/api`,
     endpoints: {
-      // 用户认证相关
-      authentication: {
-        title: '用户认证',
-        endpoints: {
-          'POST /users/register': {
-            description: '用户注册',
-            body: {
-              username: 'string (required)',
-              email: 'string (required)',
-              password: 'string (required, min 6 chars)'
-            },
-            response: {
-              success: 'boolean',
-              message: 'string',
-              data: {
-                user: 'object',
-                tokens: {
-                  access_token: 'string',
-                  refresh_token: 'string'
-                }
-              }
-            }
-          },
-          'POST /users/login': {
-            description: '用户登录',
-            body: {
-              email: 'string (required)',
-              password: 'string (required)'
-            },
-            response: {
-              success: 'boolean',
-              message: 'string',
-              data: {
-                user: 'object',
-                tokens: {
-                  access_token: 'string',
-                  refresh_token: 'string'
-                }
-              }
-            }
-          },
-          'POST /users/refresh': {
-            description: '刷新访问令牌',
-            body: {
-              refresh_token: 'string (required)'
-            },
-            response: {
-              success: 'boolean',
-              data: {
-                access_token: 'string',
-                refresh_token: 'string'
-              }
-            }
-          },
-          'POST /users/logout': {
-            description: '用户登出',
-            headers: {
-              Authorization: 'Bearer <access_token>'
-            },
-            response: {
-              success: 'boolean',
-              message: 'string'
-            }
-          }
-        }
-      },
-      
-      // 用户管理
-      users: {
-        title: '用户管理',
-        endpoints: {
-          'GET /users/profile': {
-            description: '获取当前用户信息',
-            headers: {
-              Authorization: 'Bearer <access_token>'
-            },
-            response: {
-              success: 'boolean',
-              data: {
-                user: 'object'
-              }
-            }
-          },
-          'PUT /users/profile': {
-            description: '更新用户信息',
-            headers: {
-              Authorization: 'Bearer <access_token>'
-            },
-            body: {
-              username: 'string (optional)',
-              email: 'string (optional)',
-              avatar_url: 'string (optional)'
-            },
-            response: {
-              success: 'boolean',
-              data: {
-                user: 'object'
-              }
-            }
-          },
-          'PUT /users/password': {
-            description: '修改密码',
-            headers: {
-              Authorization: 'Bearer <access_token>'
-            },
-            body: {
-              current_password: 'string (required)',
-              new_password: 'string (required, min 6 chars)'
-            },
-            response: {
-              success: 'boolean',
-              message: 'string'
-            }
-          }
-        }
-      },
-      
-      // 项目管理
+      // 项目管理相关
       projects: {
         title: '项目管理',
         endpoints: {
           'GET /projects': {
             description: '获取项目列表',
-            headers: {
-              Authorization: 'Bearer <access_token>'
-            },
             query: {
-              page: 'number (default: 1)',
-              limit: 'number (default: 10)',
+              page: 'number (optional, default: 1)',
+              limit: 'number (optional, default: 10)',
               status: 'string (optional)',
               search: 'string (optional)'
             },
@@ -145,71 +28,55 @@ router.get('/', (req, res) => {
               success: 'boolean',
               data: {
                 projects: 'array',
-                total: 'number'
+                pagination: 'object'
               }
             }
           },
           'POST /projects': {
-            description: '创建项目',
-            headers: {
-              Authorization: 'Bearer <access_token>'
-            },
+            description: '创建新项目',
             body: {
               name: 'string (required)',
               description: 'string (optional)',
-              status: 'string (default: active)',
               start_date: 'date (optional)',
-              end_date: 'date (optional)'
+              end_date: 'date (optional)',
+              status: 'string (optional, default: active)'
             },
             response: {
               success: 'boolean',
-              data: {
-                project: 'object'
-              }
+              data: 'object',
+              message: 'string'
             }
           },
           'GET /projects/:id': {
             description: '获取项目详情',
-            headers: {
-              Authorization: 'Bearer <access_token>'
-            },
             params: {
               id: 'number (required)'
             },
             response: {
               success: 'boolean',
-              data: {
-                project: 'object'
-              }
+              data: 'object'
             }
           },
           'PUT /projects/:id': {
             description: '更新项目',
-            headers: {
-              Authorization: 'Bearer <access_token>'
-            },
             params: {
               id: 'number (required)'
             },
             body: {
               name: 'string (optional)',
               description: 'string (optional)',
-              status: 'string (optional)',
               start_date: 'date (optional)',
-              end_date: 'date (optional)'
+              end_date: 'date (optional)',
+              status: 'string (optional)'
             },
             response: {
               success: 'boolean',
-              data: {
-                project: 'object'
-              }
+              data: 'object',
+              message: 'string'
             }
           },
           'DELETE /projects/:id': {
             description: '删除项目',
-            headers: {
-              Authorization: 'Bearer <access_token>'
-            },
             params: {
               id: 'number (required)'
             },
@@ -221,99 +88,73 @@ router.get('/', (req, res) => {
         }
       },
       
-      // 任务管理
+      // 任务管理相关
       tasks: {
         title: '任务管理',
         endpoints: {
           'GET /tasks': {
             description: '获取任务列表',
-            headers: {
-              Authorization: 'Bearer <access_token>'
-            },
             query: {
-              page: 'number (default: 1)',
-              limit: 'number (default: 10)',
               project_id: 'number (optional)',
               status: 'string (optional)',
               priority: 'string (optional)',
-              assigned_to: 'number (optional)',
-              search: 'string (optional)'
+              page: 'number (optional, default: 1)',
+              limit: 'number (optional, default: 10)'
             },
             response: {
               success: 'boolean',
               data: {
                 tasks: 'array',
-                total: 'number'
+                pagination: 'object'
               }
             }
           },
           'POST /tasks': {
-            description: '创建任务',
-            headers: {
-              Authorization: 'Bearer <access_token>'
-            },
+            description: '创建新任务',
             body: {
               title: 'string (required)',
               description: 'string (optional)',
               project_id: 'number (required)',
-              assigned_to: 'number (optional)',
-              status: 'string (default: todo)',
-              priority: 'string (default: medium)',
-              due_date: 'date (optional)',
-              estimated_hours: 'number (optional)'
+              priority: 'string (optional, default: medium)',
+              status: 'string (optional, default: pending)',
+              due_date: 'date (optional)'
             },
             response: {
               success: 'boolean',
-              data: {
-                task: 'object'
-              }
+              data: 'object',
+              message: 'string'
             }
           },
           'GET /tasks/:id': {
             description: '获取任务详情',
-            headers: {
-              Authorization: 'Bearer <access_token>'
-            },
             params: {
               id: 'number (required)'
             },
             response: {
               success: 'boolean',
-              data: {
-                task: 'object'
-              }
+              data: 'object'
             }
           },
           'PUT /tasks/:id': {
             description: '更新任务',
-            headers: {
-              Authorization: 'Bearer <access_token>'
-            },
             params: {
               id: 'number (required)'
             },
             body: {
               title: 'string (optional)',
               description: 'string (optional)',
-              assigned_to: 'number (optional)',
-              status: 'string (optional)',
               priority: 'string (optional)',
-              due_date: 'date (optional)',
-              estimated_hours: 'number (optional)',
-              actual_hours: 'number (optional)'
+              status: 'string (optional)',
+              due_date: 'date (optional)'
             },
             response: {
               success: 'boolean',
-              data: {
-                task: 'object'
-              }
+              data: 'object',
+              message: 'string'
             }
           },
           'DELETE /tasks/:id': {
             description: '删除任务',
-            headers: {
-              Authorization: 'Bearer <access_token>'
-            },
             params: {
               id: 'number (required)'
             },
@@ -324,83 +165,168 @@ router.get('/', (req, res) => {
           }
         }
       },
-      
+
+      // 利益相关者管理
+      stakeholders: {
+        title: '利益相关者管理',
+        endpoints: {
+          'GET /:projectId/stakeholders': {
+            description: '获取项目利益相关者列表',
+            params: {
+              projectId: 'number (required)'
+            },
+            response: {
+              success: 'boolean',
+              data: 'array'
+            }
+          },
+          'POST /:projectId/stakeholders': {
+            description: '添加利益相关者',
+            params: {
+              projectId: 'number (required)'
+            },
+            body: {
+              name: 'string (required)',
+              role: 'string (required)',
+              contact_info: 'string (optional)',
+              influence_level: 'string (optional)',
+              interest_level: 'string (optional)'
+            },
+            response: {
+              success: 'boolean',
+              data: 'object',
+              message: 'string'
+            }
+          }
+        }
+      },
+
+      // 子项目管理
+      subprojects: {
+        title: '子项目管理',
+        endpoints: {
+          'GET /:projectId/subprojects': {
+            description: '获取子项目列表',
+            params: {
+              projectId: 'number (required)'
+            },
+            response: {
+              success: 'boolean',
+              data: 'array'
+            }
+          },
+          'POST /:projectId/subprojects': {
+            description: '创建子项目',
+            params: {
+              projectId: 'number (required)'
+            },
+            body: {
+              name: 'string (required)',
+              description: 'string (optional)',
+              start_date: 'date (optional)',
+              end_date: 'date (optional)'
+            },
+            response: {
+              success: 'boolean',
+              data: 'object',
+              message: 'string'
+            }
+          }
+        }
+      },
+
+      // 故事线管理
+      storylines: {
+        title: '故事线管理',
+        endpoints: {
+          'GET /:projectId/storylines': {
+            description: '获取项目故事线列表',
+            params: {
+              projectId: 'number (required)'
+            },
+            query: {
+              page: 'number (optional, default: 1)',
+              limit: 'number (optional, default: 20)',
+              sortBy: 'string (optional, default: event_time)',
+              sortOrder: 'string (optional, default: DESC)'
+            },
+            response: {
+              success: 'boolean',
+              data: 'object'
+            }
+          },
+          'POST /:projectId/storylines': {
+            description: '创建故事线',
+            params: {
+              projectId: 'number (required)'
+            },
+            body: {
+              title: 'string (required)',
+              description: 'string (optional)',
+              event_time: 'datetime (required)',
+              event_type: 'string (required)',
+              participants: 'array (optional)',
+              location: 'string (optional)'
+            },
+            response: {
+              success: 'boolean',
+              data: 'object',
+              message: 'string'
+            }
+          }
+        }
+      },
+
       // 文件上传
       upload: {
         title: '文件上传',
         endpoints: {
-          'POST /upload/file': {
-            description: '上传单个文件',
-            headers: {
-              Authorization: 'Bearer <access_token>',
-              'Content-Type': 'multipart/form-data'
-            },
+          'POST /upload/single': {
+            description: '单文件上传',
             body: {
               file: 'file (required)',
               project_id: 'number (optional)',
               task_id: 'number (optional)',
+              category: 'string (optional, default: other)',
               description: 'string (optional)'
             },
             response: {
               success: 'boolean',
-              data: {
-                file: {
-                  id: 'number',
-                  filename: 'string',
-                  original_name: 'string',
-                  file_size: 'number',
-                  file_type: 'string',
-                  file_url: 'string'
-                }
-              }
+              data: 'object',
+              message: 'string'
             }
           },
           'POST /upload/multiple': {
-            description: '上传多个文件',
-            headers: {
-              Authorization: 'Bearer <access_token>',
-              'Content-Type': 'multipart/form-data'
-            },
+            description: '多文件上传',
             body: {
-              files: 'file[] (required)',
+              files: 'files (required)',
               project_id: 'number (optional)',
               task_id: 'number (optional)',
+              category: 'string (optional, default: other)',
               description: 'string (optional)'
             },
             response: {
               success: 'boolean',
-              data: {
-                files: 'array',
-                uploaded_count: 'number',
-                failed_count: 'number'
-              }
+              data: 'array',
+              message: 'string'
             }
           },
           'GET /upload/files': {
             description: '获取文件列表',
-            headers: {
-              Authorization: 'Bearer <access_token>'
-            },
             query: {
-              page: 'number (default: 1)',
-              limit: 'number (default: 10)',
               project_id: 'number (optional)',
               task_id: 'number (optional)',
-              file_type: 'string (optional)'
+              category: 'string (optional)',
+              page: 'number (optional, default: 1)',
+              limit: 'number (optional, default: 20)'
             },
             response: {
               success: 'boolean',
-              data: {
-                files: 'array',
-                total: 'number'
-              }
+              data: 'object'
             }
           },
           'DELETE /upload/files/:id': {
             description: '删除文件',
-            headers: {
-              Authorization: 'Bearer <access_token>'
-            },
             params: {
               id: 'number (required)'
             },
@@ -410,6 +336,25 @@ router.get('/', (req, res) => {
             }
           }
         }
+      }
+    },
+    
+    // 通用响应格式
+    commonResponses: {
+      success: {
+        success: true,
+        data: 'object|array',
+        message: 'string (optional)'
+      },
+      error: {
+        success: false,
+        message: 'string',
+        error: 'string (optional)'
+      },
+      validation: {
+        success: false,
+        message: 'string',
+        errors: 'array'
       }
     },
     
@@ -418,42 +363,11 @@ router.get('/', (req, res) => {
       200: 'OK - 请求成功',
       201: 'Created - 资源创建成功',
       400: 'Bad Request - 请求参数错误',
-      401: 'Unauthorized - 未授权或token无效',
-      403: 'Forbidden - 权限不足',
       404: 'Not Found - 资源不存在',
-      409: 'Conflict - 资源冲突',
-      422: 'Unprocessable Entity - 数据验证失败',
-      429: 'Too Many Requests - 请求过于频繁',
       500: 'Internal Server Error - 服务器内部错误'
-    },
-    
-    // 通用响应格式
-    responseFormat: {
-      success: {
-        success: true,
-        message: 'string (optional)',
-        data: 'object | array'
-      },
-      error: {
-        success: false,
-        message: 'string',
-        error: 'string (optional)',
-        details: 'object (optional)'
-      }
-    },
-    
-    // 认证说明
-    authentication: {
-      type: 'Bearer Token',
-      header: 'Authorization: Bearer <access_token>',
-      tokenExpiry: {
-        access_token: '15 minutes',
-        refresh_token: '7 days'
-      },
-      note: '大部分API需要在请求头中包含有效的访问令牌'
     }
   };
-  
+
   res.json(apiDocs);
 });
 

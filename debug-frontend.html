@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>前端API调试</title>
+</head>
+<body>
+    <h1>前端API调试工具</h1>
+    <button onclick="testAPI()">测试API调用</button>
+    <div id="result"></div>
+
+    <script>
+        async function testAPI() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>正在调用API...</p>';
+            
+            try {
+                console.log('开始调用API...');
+                const response = await fetch('/api/projects?page=1&limit=10&sortBy=updated_at&sortOrder=desc');
+                console.log('API响应状态:', response.status);
+                console.log('API响应头:', response.headers);
+                
+                const data = await response.json();
+                console.log('API返回数据:', data);
+                console.log('数据类型:', typeof data);
+                console.log('数据结构:', Object.keys(data));
+                console.log('项目数组:', data.data);
+                console.log('项目数组长度:', data.data ? data.data.length : 'undefined');
+                
+                resultDiv.innerHTML = `
+                    <h2>API调用结果:</h2>
+                    <p><strong>状态:</strong> ${response.status}</p>
+                    <p><strong>成功:</strong> ${data.success}</p>
+                    <p><strong>项目数量:</strong> ${data.data ? data.data.length : 0}</p>
+                    <h3>项目列表:</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                console.error('API调用错误:', error);
+                resultDiv.innerHTML = `<p style="color: red;">错误: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

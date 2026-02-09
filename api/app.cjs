@@ -4,17 +4,18 @@ const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const { db } = require('./lib/database.cjs');
-const { AuthService } = require('./services/authService.cjs');
 
 // 导入路由
-const authRouter = require('./routes/auth.cjs');
-const usersRouter = require('./routes/users.cjs');
 const projectsRouter = require('./routes/projects.cjs');
 const tasksRouter = require('./routes/tasks.cjs');
 const uploadRouter = require('./routes/upload.cjs');
+const storiesRouter = require('./routes/stories.cjs');
+const storyFollowUpRouter = require('./routes/storyFollowUp.cjs');
+const efficiencyRouter = require('./routes/efficiency.cjs');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const SKIP_DB_ON_START = process.env.SKIP_DB_ON_START === 'true';
 
 // 安全中间件
 app.use(helmet({
@@ -81,19 +82,9 @@ const limiter = rateLimit({
   legacyHeaders: false
 });
 
-// 登录接口特殊限制
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15分钟
-  max: 5, // 限制每个IP 15分钟内最多5次登录尝试
-  message: {
-    success: false,
-    message: '登录尝试过于频繁，请15分钟后再试'
-  },
-  skipSuccessfulRequests: true
-});
+// 登录接口特殊限制已移除 - 允许无限制登录
 
 app.use('/api/', limiter);
-app.use('/api/users/login', loginLimiter);
 
 // 请求日志中间件
 app.use((req, res, next) => {
@@ -112,12 +103,15 @@ app.use((req, res, next) => {
 // 健康检查接口
 app.get('/health', async (req, res) => {
   try {
-    // 检查数据库连接
-    await db.testConnection();
+    // 检查数据库连接（开发模式可跳过）
+    if (!SKIP_DB_ON_START) {
+      await db.testConnection();
+    }
     
     res.json({
       success: true,
       message: '服务运行正常',
+      db_check_skipped: SKIP_DB_ON_START,
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       memory: process.memoryUsage(),
@@ -134,11 +128,36 @@ app.get('/health', async (req, res) => {
 });
 
 // API路由
-app.use('/api/auth', authRouter);
-app.use('/api/users', usersRouter);
 app.use('/api/projects', projectsRouter);
 app.use('/api/tasks', tasksRouter);
 app.use('/api/upload', uploadRouter);
+app.use('/api', storyFollowUpRouter);
+app.use('/api/stories', storiesRouter);
+app.use('/api/efficiency', efficiencyRouter);
+
+// 新增路由
+const subprojectsRouter = require('./routes/subprojects.cjs');
+const storylinesRouter = require('./routes/storylines.cjs');
+const stakeholdersRouter = require('./routes/stakeholders.cjs');
+const stakeholdersGlobalRouter = require('./routes/stakeholdersGlobal.cjs');
+const identityTypesRouter = require('./routes/identityTypes.cjs');
+const storylineFollowUpRouter = require('./routes/storylineFollowUp.cjs');
+
+app.use('/api/projects', subprojectsRouter);
+app.use('/api/projects', storylinesRouter);
+app.use('/api/projects', storylineFollowUpRouter);
+app.use('/api/projects', stakeholdersRouter);
+app.use('/api', stakeholdersGlobalRouter);
+app.use('/api', identityTypesRouter);
+
+// 错误处理中间件
+const { errorHandler, notFoundHandler } = require('./middleware/errorHandler.cjs');
+
+// 404处理
+app.use(notFoundHandler);
+
+// 全局错误处理
+app.use(errorHandler);
 
 // 根路径
 app.get('/', (req, res) => {
@@ -156,32 +175,12 @@ app.get('/api/docs', (req, res) => {
     success: true,
     message: 'API文档',
     endpoints: {
-      users: {
-        'POST /api/users/register': '用户注册',
-        'POST /api/users/login': '用户登录',
-        'POST /api/users/logout': '用户登出',
-        'POST /api/users/refresh-token': '刷新token',
-        'GET /api/users/me': '获取当前用户信息',
-        'PUT /api/users/me': '更新当前用户信息',
-        'PUT /api/users/me/password': '修改密码',
-        'POST /api/users/forgot-password': '请求密码重置',
-        'POST /api/users/reset-password': '重置密码',
-        'GET /api/users': '获取用户列表（管理员）',
-        'GET /api/users/:id': '获取指定用户信息（管理员）',
-        'PUT /api/users/:id': '更新用户信息（管理员）',
-        'PUT /api/users/:id/status': '更新用户状态（管理员）',
-        'PUT /api/users/:id/role': '更新用户角色（管理员）'
-      },
       projects: {
         'GET /api/projects': '获取项目列表',
         'POST /api/projects': '创建项目',
         'GET /api/projects/:id': '获取项目详情',
         'PUT /api/projects/:id': '更新项目',
         'DELETE /api/projects/:id': '删除项目',
-        'GET /api/projects/:id/members': '获取项目成员',
-        'POST /api/projects/:id/members': '添加项目成员',
-        'PUT /api/projects/:id/members/:userId': '更新成员角色',
-        'DELETE /api/projects/:id/members/:userId': '移除项目成员',
         'GET /api/projects/:id/stats': '获取项目统计'
       },
       tasks: {
@@ -190,7 +189,6 @@ app.get('/api/docs', (req, res) => {
         'GET /api/tasks/:id': '获取任务详情',
         'PUT /api/tasks/:id': '更新任务',
         'DELETE /api/tasks/:id': '删除任务',
-        'PUT /api/tasks/:id/status': '更新任务状态',
         'PUT /api/tasks/:id/hours': '更新任务工时',
         'GET /api/tasks/:id/comments': '获取任务评论',
         'POST /api/tasks/:id/comments': '添加任务评论',
@@ -218,48 +216,7 @@ app.use((req, res) => {
   });
 });
 
-// 全局错误处理中间件
-app.use((error, req, res, next) => {
-  console.error('全局错误:', error);
-  
-  // CORS错误
-  if (error.message === '不允许的CORS来源') {
-    return res.status(403).json({
-      success: false,
-      message: '跨域请求被拒绝'
-    });
-  }
-  
-  // JSON解析错误
-  if (error instanceof SyntaxError && error.status === 400 && 'body' in error) {
-    return res.status(400).json({
-      success: false,
-      message: '请求数据格式错误'
-    });
-  }
-  
-  // 数据库错误
-  if (error.code === 'ER_DUP_ENTRY') {
-    return res.status(400).json({
-      success: false,
-      message: '数据已存在'
-    });
-  }
-  
-  if (error.code === 'ER_NO_REFERENCED_ROW_2') {
-    return res.status(400).json({
-      success: false,
-      message: '关联数据不存在'
-    });
-  }
-  
-  // 默认错误响应
-  res.status(error.status || 500).json({
-    success: false,
-    message: process.env.NODE_ENV === 'development' ? error.message : '服务器内部错误',
-    ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
-  });
-});
+// 全局错误处理中间件已在上面导入和使用
 
 // 优雅关闭处理
 process.on('SIGTERM', async () => {
@@ -303,39 +260,27 @@ process.on('unhandledRejection', (reason, promise) => {
   process.exit(1);
 });
 
-// 启动服务器
-const startServer = async () => {
-  try {
-    // 测试数据库连接
-    await db.testConnection();
-    console.log('数据库连接成功');
-    
-    // 清理过期token（启动时执行一次）
-    await AuthService.cleanupExpiredTokens();
-    console.log('过期token清理完成');
-    
-    // 启动定时任务清理过期token（每小时执行一次）
-    setInterval(async () => {
-      try {
-        await AuthService.cleanupExpiredTokens();
-        console.log('定时清理过期token完成');
-      } catch (error) {
-        console.error('定时清理过期token失败:', error);
+// 启动服务器（仅当直接运行 app.cjs 时）
+if (require.main === module) {
+  (async () => {
+    try {
+      if (!SKIP_DB_ON_START) {
+        await db.testConnection();
+        console.log('数据库连接成功');
+        await db.ensureStakeholderGlobalUniqueName();
+      } else {
+        console.log('跳过数据库连接测试（开发模式）');
       }
-    }, 60 * 60 * 1000); // 1小时
-    
-    app.listen(PORT, () => {
-      console.log(`服务器运行在端口 ${PORT}`);
-      console.log(`健康检查: http://localhost:${PORT}/health`);
-      console.log(`API文档: http://localhost:${PORT}/api/docs`);
-    });
-  } catch (error) {
-    console.error('服务器启动失败:', error);
-    process.exit(1);
-  }
-};
-
-// 启动应用
-startServer();
+      app.listen(PORT, () => {
+        console.log(`服务器运行在端口 ${PORT}`);
+        console.log(`健康检查: http://localhost:${PORT}/health`);
+        console.log(`API文档: http://localhost:${PORT}/api/docs`);
+      });
+    } catch (error) {
+      console.error('服务器启动失败:', error);
+      process.exit(1);
+    }
+  })();
+}
 
 module.exports = app;

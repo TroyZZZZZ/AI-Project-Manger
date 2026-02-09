@@ -8,14 +8,20 @@ export default defineConfig({
   build: {
     sourcemap: 'hidden',
   },
+  server: {
+    port: 5173,
+    strictPort: true,
+    host: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false
+      }
+    }
+  },
   plugins: [
-    react({
-      babel: {
-        plugins: [
-          'react-dev-locator',
-        ],
-      },
-    }),
+    react(),
     traeBadgePlugin({
       variant: 'dark',
       position: 'bottom-right',

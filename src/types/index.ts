@@ -1,92 +1,49 @@
-// 用户类型
-export interface User {
-  id: string
-  email: string
-  name: string
-  avatar_url?: string
-  created_at: string
-  updated_at: string
-}
-
-// 项目状态枚举
-export enum ProjectStatus {
-  PLANNING = 'planning',
-  IN_PROGRESS = 'in_progress',
-  ON_HOLD = 'on_hold',
-  COMPLETED = 'completed',
-  CANCELLED = 'cancelled'
-}
-
-// 项目优先级枚举
-export enum ProjectPriority {
-  LOW = 'low',
-  MEDIUM = 'medium',
-  HIGH = 'high',
-  URGENT = 'urgent'
-}
-
-// 项目类型
+// 项目类型（单用户系统）
 export interface Project {
-  id: string
+  id: number
   name: string
   description?: string
-  status: ProjectStatus
-  priority: ProjectPriority
   start_date: string
   end_date?: string
   estimated_hours: number
   actual_hours: number
-  progress: number // 0-100
-  owner_id: string
   created_at: string
   updated_at: string
   tags?: string[]
   color?: string
+  // 新增字段
+  parent_id?: number
+  project_level: number
 }
 
-// 任务状态枚举
-export enum TaskStatus {
-  TODO = 'todo',
-  IN_PROGRESS = 'in_progress',
-  REVIEW = 'review',
-  DONE = 'done',
-  CANCELLED = 'cancelled'
-}
-
-// 任务类型
+// 任务类型（单用户系统）
 export interface Task {
-  id: string
-  project_id: string
+  id: number
+  project_id: number
   title: string
   description?: string
-  status: TaskStatus
-  priority: ProjectPriority
-  estimated_hours: number
   actual_hours: number
-  assignee_id?: string
   due_date?: string
   completed_at?: string
   created_at: string
   updated_at: string
   tags?: string[]
-  dependencies?: string[] // 依赖的任务ID
+  dependencies?: number[] // 依赖的任务ID
 }
 
 // 时间线事件类型枚举
 export enum TimelineEventType {
   PROJECT_CREATED = 'project_created',
   PROJECT_UPDATED = 'project_updated',
-  PROJECT_STATUS_CHANGED = 'project_status_changed',
   TASK_CREATED = 'task_created',
   TASK_UPDATED = 'task_updated',
-  TASK_STATUS_CHANGED = 'task_status_changed',
   MILESTONE_REACHED = 'milestone_reached',
   DEADLINE_APPROACHING = 'deadline_approaching',
-  STAKEHOLDER_ADDED = 'stakeholder_added',
   COMMENT_ADDED = 'comment_added'
 }
 
 // 时间线事件
+// 时间线事件类型（单用户系统）
 export interface TimelineEvent {
   id: string
   project_id: string
@@ -94,40 +51,10 @@ export interface TimelineEvent {
   title: string
   description?: string
   metadata?: Record<string, any>
-  user_id: string
   created_at: string
 }
 
-// 干系人角色枚举
-export enum StakeholderRole {
-  OWNER = 'owner',
-  MANAGER = 'manager',
-  DEVELOPER = 'developer',
-  DESIGNER = 'designer',
-  TESTER = 'tester',
-  CLIENT = 'client',
-  OBSERVER = 'observer'
-}
 
-// 干系人类型
-export interface Stakeholder {
-  id: string
-  project_id: string
-  user_id?: string
-  name: string
-  email: string
-  role: StakeholderRole
-  phone?: string
-  company?: string
-  notes?: string
-  notification_preferences: {
-    email: boolean
-    in_app: boolean
-    sms: boolean
-  }
-  created_at: string
-  updated_at: string
-}
 
 // 提醒类型枚举
 export enum ReminderType {
@@ -142,36 +69,22 @@ export enum ReminderType {
 export enum ReminderStatus {
   PENDING = 'pending',
   SENT = 'sent',
-  DISMISSED = 'dismissed'
+  CANCELLED = 'cancelled'
 }
 
-// 提醒类型
+// 提醒类型（单用户系统）
 export interface Reminder {
-  id: string
-  project_id: string
-  task_id?: string
+  id: number
+  project_id?: number
+  task_id?: number
   type: ReminderType
   title: string
   description?: string
   remind_at: string
   status: ReminderStatus
-  recipients: string[] // 用户ID或邮箱
-  created_by: string
+  sent_at?: string
   created_at: string
   updated_at: string
-}
-
-// 工作量统计类型
-export interface WorkloadStats {
-  project_id: string
-  total_estimated_hours: number
-  total_actual_hours: number
-  completed_tasks: number
-  total_tasks: number
-  completion_rate: number
-  efficiency_rate: number // actual/estimated
-  weekly_hours: { week: string; hours: number }[]
-  monthly_hours: { month: string; hours: number }[]
 }
 
 // 导出选项类型
@@ -183,7 +96,6 @@ export interface ExportOptions {
   }
   includeCharts: boolean
   includeTimeline: boolean
-  includeStakeholders: boolean
   projects?: string[] // 项目ID列表
 }
 
@@ -213,27 +125,161 @@ export interface PaginatedResponse<T> {
   }
 }
 
-// 过滤器类型
-export interface ProjectFilters {
-  status?: ProjectStatus[]
-  priority?: ProjectPriority[]
-  tags?: string[]
-  dateRange?: {
-    start: string
-    end: string
-  }
-  search?: string
-}
+
 
 // 仪表板统计类型
 export interface DashboardStats {
-  totalProjects: number
-  activeProjects: number
-  completedProjects: number
-  totalTasks: number
-  completedTasks: number
-  totalHours: number
-  thisWeekHours: number
-  upcomingDeadlines: number
-  overdueItems: number
+  active_projects: number
+  completed_projects: number
+  pending_tasks: number
+  completed_tasks: number
+  week_planned_hours: number
+  week_actual_hours: number
+  month_planned_hours: number
+  month_actual_hours: number
+  utilization_rate: number
+}
+
+// 干系人类型枚举
+export enum StakeholderRole {
+  SPONSOR = 'sponsor',
+  OWNER = 'owner',
+  MANAGER = 'manager',
+  MEMBER = 'member',
+  CONSULTANT = 'consultant',
+  USER = 'user',
+  REVIEWER = 'reviewer',
+  STAKEHOLDER = 'stakeholder',
+  OBSERVER = 'observer'
+}
+
+// 身份类型枚举
+export enum IdentityType {
+  SUPPLIER = 'supplier',
+  SUZHOU_TECH_EQUITY_SERVICE = 'suzhou_tech_equity_service'
+}
+
+// 干系人类型
+export interface Stakeholder {
+  id: string
+  project_id: string
+  name: string
+  company?: string
+  role: string // 改为 string 类型，支持手动输入
+  contact_info?: string // 联系信息字段
+  identity_type?: string // 新增身份类型字段，支持任意字符串
+  is_resigned?: boolean // 是否离职
+  created_at: string
+  updated_at: string
+}
+
+// 故事线类型（单用户系统）
+export interface Storyline {
+  id: string
+  project_id: string
+  title: string
+  content: string
+  event_time: string
+  stakeholder_ids?: string[]
+  next_follow_up?: string
+  expected_outcome?: string
+  created_at: string
+  updated_at: string
+}
+
+// 子项目类型
+export interface SubProject extends Project {
+  project_id: string // 添加project_id字段
+  parent_project?: Project
+  children?: SubProject[]
+  depth?: number
+}
+
+// 独立子项目类型（单用户系统）
+export interface IndependentSubProject {
+  id: string
+  parent_project_id: string
+  name: string
+  description?: string
+  start_date?: string
+  end_date?: string
+  actual_hours?: number
+  created_at: string
+  updated_at: string
+}
+
+// 项目树节点接口
+export interface ProjectTreeNode {
+  id: string
+  name: string
+  level: number
+  parent_id?: string
+  children: ProjectTreeNode[]
+  project: Project
+  actual_hours?: number
+}
+
+export type TaskSourceType = 'project_story' | 'storyline' | 'follow_up' | 'storyline_follow_up'
+
+export interface TaskSource {
+  source_type: TaskSourceType
+  source_id: number
+  project_id: number
+  title: string
+  detail?: string
+  story_id?: number // For filtering Follow-ups by Story
+  subproject_id?: number
+  subproject_name?: string
+  next_follow_up_date?: string
+}
+
+export interface WorkLog {
+  id: number
+  project_id: number
+  project_name?: string
+  sub_project_name?: string
+  source_type: TaskSourceType
+  source_id: number
+  source_title?: string
+  description?: string
+  hours_spent: number | string
+  work_date: string
+  started_at?: string
+  ended_at?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface WorkLogSummary {
+  start_date: string
+  end_date: string
+  total_hours: number
+  by_project: Array<{
+    project_id: number
+    project_name: string
+    hours: number
+  }>
+  by_day: Array<{
+    work_date: string
+    hours: number
+  }>
+}
+
+export type GoalPeriod = 'daily' | 'weekly' | 'custom'
+export type GoalStatus = 'active' | 'completed' | 'archived'
+
+export interface MicroGoal {
+  id: number
+  title: string
+  period: GoalPeriod
+  target_hours: number
+  project_id?: number | null
+  start_date: string
+  end_date: string
+  status: GoalStatus
+  created_at: string
+  updated_at: string
+  progress_hours?: number
+  completion_rate?: number
+  is_completed?: boolean
 }

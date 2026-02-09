@@ -1,6 +1,5 @@
 const express = require('express');
 const { ProjectService } = require('../services/projectService.cjs');
-const { authenticate, requireRole, requireProjectMember } = require('../middleware/auth.cjs');
 const {
   validateProjectCreation,
   validateProjectUpdate,
@@ -13,18 +12,16 @@ const {
 const router = express.Router();
 
 // 获取项目列表
-router.get('/', authenticate, validatePagination, handleValidationErrors, async (req, res) => {
+router.get('/', validatePagination, handleValidationErrors, async (req, res) => {
   try {
-    const { page = 1, limit = 10, search, status, priority } = req.query;
-    const userId = req.user.id;
+    const { page = 1, limit = 10, search, priority } = req.query;
+    const userId = 1; // 固定用户ID为1，单用户系统
     
     const result = await ProjectService.getProjects({
       userId,
       page: parseInt(page),
       limit: parseInt(limit),
-      search,
-      status,
-      priority
+      search
     });
     
     res.json({
@@ -46,12 +43,55 @@ router.get('/', authenticate, validatePagination, handleValidationErrors, async 
   }
 });
 
+// 获取项目下的子项目
+router.get('/:id/subprojects', validateId(), handleValidationErrors, async (req, res) => {
+  try {
+    const projectId = parseInt(req.params.id);
+    const { db } = require('../lib/database.cjs');
+    
+    // 从 projects 表中查找作为子项目的记录 (parent_id = projectId)
+    const [subprojects] = await db.query(
+      `SELECT id, name, description, status, progress 
+       FROM projects 
+       WHERE parent_id = ? 
+       ORDER BY created_at DESC`,
+      [projectId]
+    );
+
+    // 同时查找 subprojects 表 (以防万一数据分散)
+    const [otherSubprojects] = await db.query(
+      `SELECT id, name, description, status, progress 
+       FROM subprojects 
+       WHERE parent_id = ? 
+       ORDER BY created_at DESC`,
+      [projectId]
+    );
+
+    // 合并结果，标记来源
+    const combined = [
+      ...subprojects.map(p => ({ ...p, source: 'project_table' })),
+      ...otherSubprojects.map(p => ({ ...p, source: 'subproject_table' }))
+    ];
+
+    res.json({
+      success: true,
+      data: combined
+    });
+  } catch (error) {
+    console.error('获取子项目列表失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取子项目列表失败'
+    });
+  }
+});
+
 // 创建项目
-router.post('/', authenticate, validateProjectCreation, handleValidationErrors, async (req, res) => {
+router.post('/', validateProjectCreation, handleValidationErrors, async (req, res) => {
   try {
     const projectData = {
       ...req.body,
-      created_by: req.user.id
+      created_by: 1 // 固定用户ID为1，单用户系统
     };
     
     const project = await ProjectService.createProject(projectData);
@@ -64,25 +104,33 @@ router.post('/', authenticate, validateProjectCreation, handleValidationErrors, 
   } catch (error) {
     console.error('创建项目失败:', error);
     
-    if (error.message.includes('已存在')) {
-      return res.status(400).json({
+    // 根据错误类型返回不同的状态码和消息
+    if (error.message === '项目名称已存在') {
+      res.status(409).json({
         success: false,
         message: error.message
       });
+    } else if (error.message === '项目名称不能为空' || error.message === '创建者ID不能为空') {
+      res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: error.message || '创建项目失败'
+      });
     }
-    
-    res.status(500).json({
-      success: false,
-      message: '创建项目失败'
-    });
   }
 });
 
 // 获取项目详情
-router.get('/:id', authenticate, validateId(), handleValidationErrors, requireProjectMember, async (req, res) => {
+router.get('/:id', validateId(), handleValidationErrors, async (req, res) => {
   try {
     const projectId = req.params.id;
-    const project = await ProjectService.getProjectById(projectId);
+    const userId = 1; // 固定用户ID为1，单用户系统
+    
+    const project = await ProjectService.getProjectById(projectId, userId);
     
     if (!project) {
       return res.status(404).json({
@@ -105,21 +153,13 @@ router.get('/:id', authenticate, validateId(), handleValidationErrors, requirePr
 });
 
 // 更新项目
-router.put('/:id', authenticate, validateId(), validateProjectUpdate, handleValidationErrors, requireProjectMember, async (req, res) => {
+router.put('/:id', validateId(), validateProjectUpdate, handleValidationErrors, async (req, res) => {
   try {
     const projectId = req.params.id;
+    const userId = 1; // 固定用户ID为1，单用户系统
     const updateData = req.body;
     
-    // 检查用户是否有权限更新项目（项目管理员或创建者）
-    const hasPermission = await ProjectService.checkProjectPermission(projectId, req.user.id, ['admin', 'owner']);
-    if (!hasPermission) {
-      return res.status(403).json({
-        success: false,
-        message: '没有权限更新此项目'
-      });
-    }
-    
-    const project = await ProjectService.updateProject(projectId, updateData);
+    const project = await ProjectService.updateProject(projectId, updateData, userId);
     
     res.json({
       success: true,
@@ -136,6 +176,13 @@ router.put('/:id', authenticate, validateId(), validateProjectUpdate, handleVali
       });
     }
     
+    if (error.message.includes('权限')) {
+      return res.status(403).json({
+        success: false,
+        message: error.message
+      });
+    }
+    
     res.status(500).json({
       success: false,
       message: '更新项目失败'
@@ -144,20 +191,12 @@ router.put('/:id', authenticate, validateId(), validateProjectUpdate, handleVali
 });
 
 // 删除项目
-router.delete('/:id', authenticate, validateId(), handleValidationErrors, requireProjectMember, async (req, res) => {
+router.delete('/:id', validateId(), handleValidationErrors, async (req, res) => {
   try {
     const projectId = req.params.id;
+    const userId = 1; // 固定用户ID为1，单用户系统
     
-    // 检查用户是否有权限删除项目（只有创建者可以删除）
-    const hasPermission = await ProjectService.checkProjectPermission(projectId, req.user.id, ['owner']);
-    if (!hasPermission) {
-      return res.status(403).json({
-        success: false,
-        message: '只有项目创建者可以删除项目'
-      });
-    }
-    
-    await ProjectService.deleteProject(projectId);
+    await ProjectService.deleteProject(projectId, userId);
     
     res.json({
       success: true,
@@ -165,6 +204,22 @@ router.delete('/:id', authenticate, validateId(), handleValidationErrors, requir
     });
   } catch (error) {
     console.error('删除项目失败:', error);
+
+    // 记录详细错误信息到日志文件，便于排查
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const logDir = path.join(__dirname, '..', 'logs');
+      if (!fs.existsSync(logDir)) {
+        fs.mkdirSync(logDir, { recursive: true });
+      }
+      const logFile = path.join(logDir, 'api-errors.log');
+      const timestamp = new Date().toISOString();
+      const logEntry = `[${timestamp}] 删除项目失败 - 项目ID: ${req.params.id}, 用户ID: 1, 错误: ${error.message}\n堆栈: ${error.stack}\n\n`;
+      fs.appendFileSync(logFile, logEntry);
+    } catch (logErr) {
+      console.error('写入API错误日志失败:', logErr);
+    }
     
     if (error.message.includes('不存在')) {
       return res.status(404).json({
@@ -173,8 +228,8 @@ router.delete('/:id', authenticate, validateId(), handleValidationErrors, requir
       });
     }
     
-    if (error.message.includes('存在关联')) {
-      return res.status(400).json({
+    if (error.message.includes('权限')) {
+      return res.status(403).json({
         success: false,
         message: error.message
       });
@@ -187,8 +242,37 @@ router.delete('/:id', authenticate, validateId(), handleValidationErrors, requir
   }
 });
 
+// 获取项目统计
+router.get('/:id/stats', validateId(), handleValidationErrors, async (req, res) => {
+  try {
+    const projectId = req.params.id;
+    const userId = 1; // 固定用户ID为1，单用户系统
+    
+    const stats = await ProjectService.getProjectStats(projectId, userId);
+    
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('获取项目统计失败:', error);
+    
+    if (error.message.includes('不存在')) {
+      return res.status(404).json({
+        success: false,
+        message: error.message
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: '获取项目统计失败'
+    });
+  }
+});
+
 // 获取项目成员
-router.get('/:id/members', authenticate, validateId(), handleValidationErrors, requireProjectMember, async (req, res) => {
+router.get('/:id/members', validateId(), handleValidationErrors, async (req, res) => {
   try {
     const projectId = req.params.id;
     const members = await ProjectService.getProjectMembers(projectId);
@@ -202,229 +286,6 @@ router.get('/:id/members', authenticate, validateId(), handleValidationErrors, r
     res.status(500).json({
       success: false,
       message: '获取项目成员失败'
-    });
-  }
-});
-
-// 添加项目成员
-router.post('/:id/members', authenticate, validateId(), validateProjectMember, handleValidationErrors, requireProjectMember, async (req, res) => {
-  try {
-    const projectId = req.params.id;
-    const { user_id, role = 'member' } = req.body;
-    
-    // 检查用户是否有权限添加成员（项目管理员或创建者）
-    const hasPermission = await ProjectService.checkProjectPermission(projectId, req.user.id, ['admin', 'owner']);
-    if (!hasPermission) {
-      return res.status(403).json({
-        success: false,
-        message: '没有权限添加项目成员'
-      });
-    }
-    
-    await ProjectService.addProjectMember(projectId, user_id, role);
-    
-    res.status(201).json({
-      success: true,
-      message: '项目成员添加成功'
-    });
-  } catch (error) {
-    console.error('添加项目成员失败:', error);
-    
-    if (error.message.includes('已是成员')) {
-      return res.status(400).json({
-        success: false,
-        message: error.message
-      });
-    }
-    
-    if (error.message.includes('不存在')) {
-      return res.status(404).json({
-        success: false,
-        message: error.message
-      });
-    }
-    
-    res.status(500).json({
-      success: false,
-      message: '添加项目成员失败'
-    });
-  }
-});
-
-// 更新成员角色
-router.put('/:id/members/:userId', authenticate, validateId(), handleValidationErrors, requireProjectMember, async (req, res) => {
-  try {
-    const { id: projectId, userId } = req.params;
-    const { role } = req.body;
-    
-    if (!role || !['member', 'admin'].includes(role)) {
-      return res.status(400).json({
-        success: false,
-        message: '无效的角色类型'
-      });
-    }
-    
-    // 检查用户是否有权限更新成员角色（项目管理员或创建者）
-    const hasPermission = await ProjectService.checkProjectPermission(projectId, req.user.id, ['admin', 'owner']);
-    if (!hasPermission) {
-      return res.status(403).json({
-        success: false,
-        message: '没有权限更新成员角色'
-      });
-    }
-    
-    // 不能修改项目创建者的角色
-    const project = await ProjectService.getProjectById(projectId);
-    if (project.created_by === parseInt(userId)) {
-      return res.status(400).json({
-        success: false,
-        message: '不能修改项目创建者的角色'
-      });
-    }
-    
-    await ProjectService.updateMemberRole(projectId, userId, role);
-    
-    res.json({
-      success: true,
-      message: '成员角色更新成功'
-    });
-  } catch (error) {
-    console.error('更新成员角色失败:', error);
-    
-    if (error.message.includes('不存在')) {
-      return res.status(404).json({
-        success: false,
-        message: error.message
-      });
-    }
-    
-    res.status(500).json({
-      success: false,
-      message: '更新成员角色失败'
-    });
-  }
-});
-
-// 移除项目成员
-router.delete('/:id/members/:userId', authenticate, validateId(), handleValidationErrors, requireProjectMember, async (req, res) => {
-  try {
-    const { id: projectId, userId } = req.params;
-    
-    // 检查用户是否有权限移除成员（项目管理员或创建者）
-    const hasPermission = await ProjectService.checkProjectPermission(projectId, req.user.id, ['admin', 'owner']);
-    if (!hasPermission) {
-      return res.status(403).json({
-        success: false,
-        message: '没有权限移除项目成员'
-      });
-    }
-    
-    // 不能移除项目创建者
-    const project = await ProjectService.getProjectById(projectId);
-    if (project.created_by === parseInt(userId)) {
-      return res.status(400).json({
-        success: false,
-        message: '不能移除项目创建者'
-      });
-    }
-    
-    await ProjectService.removeProjectMember(projectId, userId);
-    
-    res.json({
-      success: true,
-      message: '项目成员移除成功'
-    });
-  } catch (error) {
-    console.error('移除项目成员失败:', error);
-    
-    if (error.message.includes('不存在')) {
-      return res.status(404).json({
-        success: false,
-        message: error.message
-      });
-    }
-    
-    res.status(500).json({
-      success: false,
-      message: '移除项目成员失败'
-    });
-  }
-});
-
-// 获取项目统计信息
-router.get('/:id/stats', authenticate, validateId(), handleValidationErrors, requireProjectMember, async (req, res) => {
-  try {
-    const projectId = req.params.id;
-    const stats = await ProjectService.getProjectStats(projectId);
-    
-    res.json({
-      success: true,
-      data: stats
-    });
-  } catch (error) {
-    console.error('获取项目统计失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '获取项目统计失败'
-    });
-  }
-});
-
-// 获取用户参与的所有项目
-router.get('/user/all', authenticate, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const projects = await ProjectService.getUserProjects(userId);
-    
-    res.json({
-      success: true,
-      data: projects
-    });
-  } catch (error) {
-    console.error('获取用户项目失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '获取用户项目失败'
-    });
-  }
-});
-
-// 搜索项目
-router.get('/search/:keyword', authenticate, async (req, res) => {
-  try {
-    const { keyword } = req.params;
-    const { page = 1, limit = 10 } = req.query;
-    const userId = req.user.id;
-    
-    if (!keyword || keyword.trim().length < 2) {
-      return res.status(400).json({
-        success: false,
-        message: '搜索关键词至少需要2个字符'
-      });
-    }
-    
-    const result = await ProjectService.searchProjects({
-      keyword: keyword.trim(),
-      userId,
-      page: parseInt(page),
-      limit: parseInt(limit)
-    });
-    
-    res.json({
-      success: true,
-      data: result.projects,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: result.total,
-        pages: Math.ceil(result.total / parseInt(limit))
-      }
-    });
-  } catch (error) {
-    console.error('搜索项目失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '搜索项目失败'
     });
   }
 });

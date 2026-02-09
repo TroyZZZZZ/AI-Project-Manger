@@ -1,0 +1,482 @@
+ Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+ App.tsx: 组件开始加载
+ main.tsx: 开始执行
+ main.tsx: 找到root元素，开始创建React根
+ main.tsx: React应用渲染完成
+ App.tsx: App组件渲染开始
+ App.tsx: 返回RouterProvider
+ App.tsx: App组件渲染开始
+ App.tsx: 返回RouterProvider
+ App.tsx: useEffect 触发，开始初始化应用
+ App.tsx: useEffect 触发，开始初始化应用
+ App.tsx: App组件渲染开始
+ App.tsx: 返回RouterProvider
+ App.tsx: App组件渲染开始
+ App.tsx: 返回RouterProvider
+ ProjectService: API响应原始数据: Object
+ ProjectService: response类型: object
+ ProjectService: response.success: true
+ ProjectService: response.data: Array(9)
+ ProjectService: 解析到项目数组(rawList): Array(9)
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换后的数据: Array(9)
+ ProjectService: API响应原始数据: Object
+ ProjectService: response类型: object
+ ProjectService: response.success: true
+ ProjectService: response.data: Array(9)
+ ProjectService: 解析到项目数组(rawList): Array(9)
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换后的数据: Array(9)
+ ProjectService: API响应原始数据: Object
+ ProjectService: response类型: object
+ ProjectService: response.success: true
+ ProjectService: response.data: Array(9)
+ ProjectService: 解析到项目数组(rawList): Array(9)
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换后的数据: Array(9)
+ ProjectService: API响应原始数据: Object
+ ProjectService: response类型: object
+ ProjectService: response.success: true
+ ProjectService: response.data: Array(9)
+ ProjectService: 解析到项目数组(rawList): Array(9)
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换项目数据: Object
+ ProjectService: 转换后的数据: Array(9)
+ ProjectService: API响应原始数据: Object
+ ProjectService: response类型: object
+ ProjectService: response.success: true
+ ProjectService: response.data: Array(9)
+projectService.ts:67 ProjectService: 解析到项目数组(rawList): Array(9)
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:92 ProjectService: 转换后的数据: Array(9)
+projectService.ts:52 ProjectService: API响应原始数据: Object
+projectService.ts:53 ProjectService: response类型: object
+projectService.ts:54 ProjectService: response.success: true
+projectService.ts:55 ProjectService: response.data: Array(9)
+projectService.ts:67 ProjectService: 解析到项目数组(rawList): Array(9)
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:92 ProjectService: 转换后的数据: Array(9)
+projectService.ts:52 ProjectService: API响应原始数据: Object
+projectService.ts:53 ProjectService: response类型: object
+projectService.ts:54 ProjectService: response.success: true
+projectService.ts:55 ProjectService: response.data: Array(9)
+projectService.ts:67 ProjectService: 解析到项目数组(rawList): Array(9)
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:92 ProjectService: 转换后的数据: Array(9)
+projectService.ts:52 ProjectService: API响应原始数据: Object
+projectService.ts:53 ProjectService: response类型: object
+projectService.ts:54 ProjectService: response.success: true
+projectService.ts:55 ProjectService: response.data: Array(9)
+projectService.ts:67 ProjectService: 解析到项目数组(rawList): Array(9)
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:92 ProjectService: 转换后的数据: Array(9)
+Efficiency.tsx:514 Submitting WorkLog: Object
+:3001/api/stories/34/follow-up-records:1  Failed to load resource: the server responded with a status of 400 (Bad Request)
+storyFollowUpService.ts:209 创建跟进记录失败: Error: 事件发生日期不能为空
+    at Module.createFollowUpRecord (storyFollowUpService.ts:204:13)
+    at async handleConfirmStop (Efficiency.tsx:607:20)
+createFollowUpRecord @ storyFollowUpService.ts:209
+Efficiency.tsx:617 Failed to mark as completed Error: 事件发生日期不能为空
+    at Module.createFollowUpRecord (storyFollowUpService.ts:204:13)
+    at async handleConfirmStop (Efficiency.tsx:607:20)
+handleConfirmStop @ Efficiency.tsx:617
+projectService.ts:52 ProjectService: API响应原始数据: Object
+projectService.ts:53 ProjectService: response类型: object
+projectService.ts:54 ProjectService: response.success: true
+projectService.ts:55 ProjectService: response.data: Array(9)
+projectService.ts:67 ProjectService: 解析到项目数组(rawList): Array(9)
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:92 ProjectService: 转换后的数据: Array(9)
+
+chunk-KDCVS43I.js?v=5acd81dd:21609 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+App.tsx:6 App.tsx: 组件开始加载
+main.tsx:6 main.tsx: 开始执行
+main.tsx:10 main.tsx: 找到root元素，开始创建React根
+main.tsx:17 main.tsx: React应用渲染完成
+App.tsx:9 App.tsx: App组件渲染开始
+App.tsx:17 App.tsx: 返回RouterProvider
+App.tsx:9 App.tsx: App组件渲染开始
+App.tsx:17 App.tsx: 返回RouterProvider
+App.tsx:13 App.tsx: useEffect 触发，开始初始化应用
+App.tsx:13 App.tsx: useEffect 触发，开始初始化应用
+App.tsx:9 App.tsx: App组件渲染开始
+App.tsx:17 App.tsx: 返回RouterProvider
+App.tsx:9 App.tsx: App组件渲染开始
+App.tsx:17 App.tsx: 返回RouterProvider
+projectService.ts:52 ProjectService: API响应原始数据: Object
+projectService.ts:53 ProjectService: response类型: object
+projectService.ts:54 ProjectService: response.success: true
+projectService.ts:55 ProjectService: response.data: Array(9)
+projectService.ts:67 ProjectService: 解析到项目数组(rawList): Array(9)
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:92 ProjectService: 转换后的数据: Array(9)
+projectService.ts:52 ProjectService: API响应原始数据: Object
+projectService.ts:53 ProjectService: response类型: object
+projectService.ts:54 ProjectService: response.success: true
+projectService.ts:55 ProjectService: response.data: Array(9)
+projectService.ts:67 ProjectService: 解析到项目数组(rawList): Array(9)
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:92 ProjectService: 转换后的数据: Array(9)
+projectService.ts:52 ProjectService: API响应原始数据: Object
+projectService.ts:53 ProjectService: response类型: object
+projectService.ts:54 ProjectService: response.success: true
+projectService.ts:55 ProjectService: response.data: Array(9)
+projectService.ts:67 ProjectService: 解析到项目数组(rawList): Array(9)
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:92 ProjectService: 转换后的数据: Array(9)
+projectService.ts:52 ProjectService: API响应原始数据: Object
+projectService.ts:53 ProjectService: response类型: object
+projectService.ts:54 ProjectService: response.success: true
+projectService.ts:55 ProjectService: response.data: Array(9)
+projectService.ts:67 ProjectService: 解析到项目数组(rawList): Array(9)
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:92 ProjectService: 转换后的数据: Array(9)
+projectService.ts:52 ProjectService: API响应原始数据: Object
+projectService.ts:53 ProjectService: response类型: object
+projectService.ts:54 ProjectService: response.success: true
+projectService.ts:55 ProjectService: response.data: Array(9)
+projectService.ts:67 ProjectService: 解析到项目数组(rawList): Array(9)
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:92 ProjectService: 转换后的数据: Array(9)
+projectService.ts:52 ProjectService: API响应原始数据: Object
+projectService.ts:53 ProjectService: response类型: object
+projectService.ts:54 ProjectService: response.success: true
+projectService.ts:55 ProjectService: response.data: Array(9)
+projectService.ts:67 ProjectService: 解析到项目数组(rawList): Array(9)
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:92 ProjectService: 转换后的数据: Array(9)
+projectService.ts:52 ProjectService: API响应原始数据: Object
+projectService.ts:53 ProjectService: response类型: object
+projectService.ts:54 ProjectService: response.success: true
+projectService.ts:55 ProjectService: response.data: Array(9)
+projectService.ts:67 ProjectService: 解析到项目数组(rawList): Array(9)
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:92 ProjectService: 转换后的数据: Array(9)
+projectService.ts:52 ProjectService: API响应原始数据: Object
+projectService.ts:53 ProjectService: response类型: object
+projectService.ts:54 ProjectService: response.success: true
+projectService.ts:55 ProjectService: response.data: Array(9)
+projectService.ts:67 ProjectService: 解析到项目数组(rawList): Array(9)
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:92 ProjectService: 转换后的数据: Array(9)
+Efficiency.tsx:514 Submitting WorkLog: Object
+:3001/api/stories/34/follow-up-records:1  Failed to load resource: the server responded with a status of 400 (Bad Request)
+storyFollowUpService.ts:209 创建跟进记录失败: Error: 事件发生日期不能为空
+    at Module.createFollowUpRecord (storyFollowUpService.ts:204:13)
+    at async handleConfirmStop (Efficiency.tsx:607:20)
+createFollowUpRecord @ storyFollowUpService.ts:209
+Efficiency.tsx:617 Failed to mark as completed Error: 事件发生日期不能为空
+    at Module.createFollowUpRecord (storyFollowUpService.ts:204:13)
+    at async handleConfirmStop (Efficiency.tsx:607:20)
+handleConfirmStop @ Efficiency.tsx:617
+projectService.ts:52 ProjectService: API响应原始数据: Object
+projectService.ts:53 ProjectService: response类型: object
+projectService.ts:54 ProjectService: response.success: true
+projectService.ts:55 ProjectService: response.data: Array(9)
+projectService.ts:67 ProjectService: 解析到项目数组(rawList): Array(9)
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:92 ProjectService: 转换后的数据: Array(9)
+
+chunk-KDCVS43I.js?v=5acd81dd:21609 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+App.tsx:6 App.tsx: 组件开始加载
+main.tsx:6 main.tsx: 开始执行
+main.tsx:10 main.tsx: 找到root元素，开始创建React根
+main.tsx:17 main.tsx: React应用渲染完成
+App.tsx:9 App.tsx: App组件渲染开始
+App.tsx:17 App.tsx: 返回RouterProvider
+App.tsx:9 App.tsx: App组件渲染开始
+App.tsx:17 App.tsx: 返回RouterProvider
+App.tsx:13 App.tsx: useEffect 触发，开始初始化应用
+App.tsx:13 App.tsx: useEffect 触发，开始初始化应用
+App.tsx:9 App.tsx: App组件渲染开始
+App.tsx:17 App.tsx: 返回RouterProvider
+App.tsx:9 App.tsx: App组件渲染开始
+App.tsx:17 App.tsx: 返回RouterProvider
+projectService.ts:52 ProjectService: API响应原始数据: Object
+projectService.ts:53 ProjectService: response类型: object
+projectService.ts:54 ProjectService: response.success: true
+projectService.ts:55 ProjectService: response.data: Array(9)
+projectService.ts:67 ProjectService: 解析到项目数组(rawList): Array(9)
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:92 ProjectService: 转换后的数据: Array(9)
+projectService.ts:52 ProjectService: API响应原始数据: Object
+projectService.ts:53 ProjectService: response类型: object
+projectService.ts:54 ProjectService: response.success: true
+projectService.ts:55 ProjectService: response.data: Array(9)
+projectService.ts:67 ProjectService: 解析到项目数组(rawList): Array(9)
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:92 ProjectService: 转换后的数据: Array(9)
+projectService.ts:52 ProjectService: API响应原始数据: Object
+projectService.ts:53 ProjectService: response类型: object
+projectService.ts:54 ProjectService: response.success: true
+projectService.ts:55 ProjectService: response.data: Array(9)
+projectService.ts:67 ProjectService: 解析到项目数组(rawList): Array(9)
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:92 ProjectService: 转换后的数据: Array(9)
+projectService.ts:52 ProjectService: API响应原始数据: Object
+projectService.ts:53 ProjectService: response类型: object
+projectService.ts:54 ProjectService: response.success: true
+projectService.ts:55 ProjectService: response.data: Array(9)
+projectService.ts:67 ProjectService: 解析到项目数组(rawList): Array(9)
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:92 ProjectService: 转换后的数据: Array(9)
+projectService.ts:52 ProjectService: API响应原始数据: Object
+projectService.ts:53 ProjectService: response类型: object
+projectService.ts:54 ProjectService: response.success: true
+projectService.ts:55 ProjectService: response.data: Array(9)
+projectService.ts:67 ProjectService: 解析到项目数组(rawList): Array(9)
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:92 ProjectService: 转换后的数据: Array(9)
+projectService.ts:52 ProjectService: API响应原始数据: Object
+projectService.ts:53 ProjectService: response类型: object
+projectService.ts:54 ProjectService: response.success: true
+projectService.ts:55 ProjectService: response.data: Array(9)
+projectService.ts:67 ProjectService: 解析到项目数组(rawList): Array(9)
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:92 ProjectService: 转换后的数据: Array(9)
+projectService.ts:52 ProjectService: API响应原始数据: Object
+projectService.ts:53 ProjectService: response类型: object
+projectService.ts:54 ProjectService: response.success: true
+projectService.ts:55 ProjectService: response.data: Array(9)
+projectService.ts:67 ProjectService: 解析到项目数组(rawList): Array(9)
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:92 ProjectService: 转换后的数据: Array(9)
+projectService.ts:52 ProjectService: API响应原始数据: Object
+projectService.ts:53 ProjectService: response类型: object
+projectService.ts:54 ProjectService: response.success: true
+projectService.ts:55 ProjectService: response.data: Array(9)
+projectService.ts:67 ProjectService: 解析到项目数组(rawList): Array(9)
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:92 ProjectService: 转换后的数据: Array(9)
+Efficiency.tsx:514 Submitting WorkLog: Object
+:3001/api/stories/34/follow-up-records:1  Failed to load resource: the server responded with a status of 400 (Bad Request)
+storyFollowUpService.ts:209 创建跟进记录失败: Error: 事件发生日期不能为空
+    at Module.createFollowUpRecord (storyFollowUpService.ts:204:13)
+    at async handleConfirmStop (Efficiency.tsx:607:20)
+createFollowUpRecord @ storyFollowUpService.ts:209
+Efficiency.tsx:617 Failed to mark as completed Error: 事件发生日期不能为空
+    at Module.createFollowUpRecord (storyFollowUpService.ts:204:13)
+    at async handleConfirmStop (Efficiency.tsx:607:20)
+handleConfirmStop @ Efficiency.tsx:617
+projectService.ts:52 ProjectService: API响应原始数据: Object
+projectService.ts:53 ProjectService: response类型: object
+projectService.ts:54 ProjectService: response.success: true
+projectService.ts:55 ProjectService: response.data: Array(9)
+projectService.ts:67 ProjectService: 解析到项目数组(rawList): Array(9)
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:71 ProjectService: 转换项目数据: Object
+projectService.ts:92 ProjectService: 转换后的数据: Array(9)

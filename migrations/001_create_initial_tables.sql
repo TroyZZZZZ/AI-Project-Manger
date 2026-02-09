@@ -6,13 +6,11 @@ CREATE TABLE IF NOT EXISTS users (
   password VARCHAR(255) NOT NULL,
   avatar VARCHAR(500),
   role ENUM('admin', 'manager', 'member') DEFAULT 'member',
-  status ENUM('active', 'inactive', 'suspended') DEFAULT 'active',
   last_login DATETIME,
   created_at DATETIME NOT NULL,
   updated_at DATETIME NOT NULL,
   INDEX idx_email (email),
   INDEX idx_username (username),
-  INDEX idx_status (status),
   INDEX idx_role (role)
 );
 
@@ -50,17 +48,12 @@ CREATE TABLE IF NOT EXISTS projects (
   name VARCHAR(100) NOT NULL,
   description TEXT,
   owner_id INT NOT NULL,
-  status ENUM('planning', 'active', 'on_hold', 'completed', 'cancelled') DEFAULT 'planning',
-  priority ENUM('low', 'medium', 'high', 'urgent') DEFAULT 'medium',
   start_date DATE,
   end_date DATE,
   budget DECIMAL(15,2),
-  progress DECIMAL(5,2) DEFAULT 0.00,
   created_at DATETIME NOT NULL,
   updated_at DATETIME NOT NULL,
   INDEX idx_owner_id (owner_id),
-  INDEX idx_status (status),
-  INDEX idx_priority (priority),
   INDEX idx_start_date (start_date),
   INDEX idx_end_date (end_date),
   FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
@@ -90,12 +83,9 @@ CREATE TABLE IF NOT EXISTS tasks (
   creator_id INT NOT NULL,
   assignee_id INT,
   parent_task_id INT,
-  status ENUM('todo', 'in_progress', 'review', 'done', 'cancelled') DEFAULT 'todo',
-  priority ENUM('low', 'medium', 'high', 'urgent') DEFAULT 'medium',
   due_date DATETIME,
   estimated_hours DECIMAL(8,2),
   actual_hours DECIMAL(8,2),
-  progress DECIMAL(5,2) DEFAULT 0.00,
   tags JSON,
   created_at DATETIME NOT NULL,
   updated_at DATETIME NOT NULL,
@@ -103,8 +93,6 @@ CREATE TABLE IF NOT EXISTS tasks (
   INDEX idx_creator_id (creator_id),
   INDEX idx_assignee_id (assignee_id),
   INDEX idx_parent_task_id (parent_task_id),
-  INDEX idx_status (status),
-  INDEX idx_priority (priority),
   INDEX idx_due_date (due_date),
   FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -244,14 +232,13 @@ CREATE TABLE IF NOT EXISTS activity_logs (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
--- 插入默认管理员用户
-INSERT INTO users (username, email, password, role, status, created_at, updated_at) 
+-- 插入默认用户
+INSERT INTO users (username, email, password, role, created_at, updated_at) 
 VALUES (
-  'admin',
-  'admin@example.com',
+  'user',
+  'user@example.com',
   '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj6hsxq9w5KS', -- 密码: admin123
-  'admin',
-  'active',
+  'member',
   NOW(),
   NOW()
 ) ON DUPLICATE KEY UPDATE id=id;

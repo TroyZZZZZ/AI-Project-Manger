@@ -1,624 +1,644 @@
 import React, { useState, useEffect } from 'react'
-import { Users, Plus, Mail, Phone, Building, Edit, Trash2, Search, Filter, UserCheck, UserX } from 'lucide-react'
+import { Search, Users, Plus, Settings, Eye, Edit2, Trash2 } from 'lucide-react'
+import { Stakeholder } from '../types'
 import { StakeholderService } from '../services/stakeholderService'
 import { ProjectService } from '../services/projectService'
-import type { Stakeholder, Project } from '../types'
-import { useResponsive } from '../hooks/useResponsive'
-import { ResponsiveGrid } from '../components/ui/ResponsiveGrid'
-import { cn } from '../utils/cn'
 
 const StakeholderManagement: React.FC = () => {
-  const { isMobile, isTablet } = useResponsive()
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>([])
-  const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [roleFilter, setRoleFilter] = useState<string>('all')
-  const [projectFilter, setProjectFilter] = useState<string>('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterType, setFilterType] = useState<string | ''>('')
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [editingStakeholder, setEditingStakeholder] = useState<Stakeholder | null>(null)
-  const [newStakeholder, setNewStakeholder] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    role: 'member' as const,
-    department: '',
-    company: '',
-    project_id: '',
-    notes: ''
-  })
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showViewModal, setShowViewModal] = useState(false)
+  const [selectedStakeholder, setSelectedStakeholder] = useState<Stakeholder | null>(null)
+  const [projects, setProjects] = useState<{ id: number; name: string }[]>([])
 
+  // 创建/编辑表单字段
+  const [formProjectId, setFormProjectId] = useState<string>('')
+  const [formName, setFormName] = useState<string>('')
+  const [formRole, setFormRole] = useState<string>('')
+  const [formCompany, setFormCompany] = useState<string>('')
+  const [formIdentityType, setFormIdentityType] = useState<string | ''>('')
+  const [formIsResigned, setFormIsResigned] = useState(false)
+  const [nameError, setNameError] = useState<string>('')
+  const [identityTypes, setIdentityTypes] = useState<{ value: string; label: string; color: string }[]>([])
+  const [showIdentityModal, setShowIdentityModal] = useState(false)
+  const [identityDraft, setIdentityDraft] = useState<{ value: string; label: string; color: string }[]>([])
+
+  const normalizeName = (value: string) => value.replace(/[\s\u00A0\u3000]/g, '')
+  
   useEffect(() => {
-    loadData()
+    loadStakeholders()
+    // 预取项目列表用于创建表单
+    loadProjects()
+    // 加载身份类型配置
+    loadIdentityTypesConfig()
   }, [])
 
-  const loadData = async () => {
+  const loadStakeholders = async () => {
     try {
       setLoading(true)
-      const [stakeholdersData, projectsData] = await Promise.all([
-        StakeholderService.getStakeholders({ page: 1, limit: 100 }),
-        ProjectService.getProjects({ page: 1, limit: 100 })
-      ])
-      setStakeholders(stakeholdersData.data)
-      setProjects(projectsData.data)
+      const data = await StakeholderService.getAllStakeholders()
+      // 前端兜底排序（中文首字母）
+      data.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh-CN'))
+      setStakeholders(data)
     } catch (error) {
-      console.error('Error loading data:', error)
+      console.error('获取干系人失败:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleCreateStakeholder = async () => {
+  const loadProjects = async () => {
     try {
-      await StakeholderService.createStakeholder(newStakeholder)
-      
-      setShowCreateModal(false)
-      setNewStakeholder({
-        name: '',
-        email: '',
-        phone: '',
-        role: 'member',
-        department: '',
-        company: '',
-        project_id: '',
-        notes: ''
-      })
-      
-      await loadData()
+      const res = await ProjectService.getProjects(undefined, 1, 100)
+      setProjects(res.data.map(p => ({ id: p.id, name: p.name })))
     } catch (error) {
-      console.error('Error creating stakeholder:', error)
+      console.error('获取项目列表失败:', error)
     }
   }
 
-  const handleUpdateStakeholder = async (id: string, updates: Partial<Stakeholder>) => {
-    try {
-      await StakeholderService.updateStakeholder(id, updates)
-      await loadData()
-      setEditingStakeholder(null)
-    } catch (error) {
-      console.error('Error updating stakeholder:', error)
+  const loadIdentityTypesConfig = async () => {
+    const list = await StakeholderService.getIdentityTypes()
+    if (Array.isArray(list) && list.length > 0) {
+      setIdentityTypes(list)
     }
   }
 
-  const handleDeleteStakeholder = async (id: string) => {
-    if (window.confirm('确定要删除这个干系人吗？')) {
-      try {
-        await StakeholderService.deleteStakeholder(id)
-        await loadData()
-      } catch (error) {
-        console.error('Error deleting stakeholder:', error)
-      }
-    }
+  const saveIdentityTypesConfig = async (next: { value: string; label: string; color: string }[]) => {
+    setIdentityTypes(next)
+    await StakeholderService.saveIdentityTypes(next)
   }
 
-  const getRoleText = (role: string) => {
-    switch (role) {
-      case 'owner': return '项目负责人'
-      case 'manager': return '项目经理'
-      case 'member': return '团队成员'
-      case 'stakeholder': return '干系人'
-      case 'client': return '客户'
-      default: return role
-    }
-  }
+  // 将列表中出现的身份类型自动合并到筛选/选择配置
+  // 取消基于列表自动添加类型，改为统一从后端配置加载与保存
 
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'owner': return 'bg-purple-100 text-purple-800'
-      case 'manager': return 'bg-blue-100 text-blue-800'
-      case 'member': return 'bg-green-100 text-green-800'
-      case 'stakeholder': return 'bg-yellow-100 text-yellow-800'
-      case 'client': return 'bg-orange-100 text-orange-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  const getProjectName = (projectId: string) => {
-    const project = projects.find(p => p.id === projectId)
-    return project?.name || '未分配项目'
-  }
-
-  const filteredStakeholders = stakeholders.filter(stakeholder => {
-    const matchesSearch = stakeholder.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         stakeholder.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         stakeholder.company?.toLowerCase().includes(searchTerm.toLowerCase())
-    
-    const matchesRole = roleFilter === 'all' || stakeholder.role === roleFilter
-    const matchesProject = projectFilter === 'all' || stakeholder.project_id === projectFilter
-    
-    return matchesSearch && matchesRole && matchesProject
+  const filteredStakeholders = (stakeholders || []).filter(stakeholder => {
+    const matchesSearch = stakeholder.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         stakeholder.role?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         stakeholder.company?.toLowerCase().includes(searchQuery.toLowerCase())
+    const normalize = (s?: string) => (s || '').replace(/\s+/g, '')
+    const identityLabel = getIdentityTypeLabel(stakeholder.identity_type || undefined)
+    const matchesType = !filterType || normalize(identityLabel) === normalize(filterType)
+    return matchesSearch && matchesType
   })
 
-  const roleStats = stakeholders.reduce((acc, stakeholder) => {
-    acc[stakeholder.role] = (acc[stakeholder.role] || 0) + 1
-    return acc
-  }, {} as Record<string, number>)
+  const handleDeleteStakeholder = async (stakeholder: Stakeholder) => {
+    if (!confirm('确定要删除这个干系人吗？')) return
+    
+    try {
+      await StakeholderService.deleteStakeholder(stakeholder.project_id, stakeholder.id)
+      await loadStakeholders() // 重新加载列表
+    } catch (error) {
+      console.error('删除干系人失败:', error)
+      alert('删除干系人失败: ' + (error as Error).message)
+    }
+  }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="bg-white p-6 rounded-lg shadow">
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                  <div className="h-8 bg-gray-200 rounded w-1/2"></div>
-                </div>
-              ))}
-            </div>
-            <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="bg-white p-6 rounded-lg shadow">
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+  const openCreateModal = () => {
+    setFormProjectId(projects[0]?.id?.toString() || '')
+    setFormName('')
+    setFormRole('')
+    setFormCompany('')
+    setFormIdentityType('')
+    setFormIsResigned(false)
+    setNameError('')
+    setShowCreateModal(true)
+  }
+
+  const submitCreateStakeholder = async () => {
+    try {
+      if (!formProjectId) {
+        alert('系统未检测到项目，请先创建项目')
+        return
+      }
+      if (!formName.trim()) {
+        alert('请填写干系人姓名')
+        return
+      }
+      // 姓名重复校验（全局范围）
+      try {
+        const allStakeholders = await StakeholderService.getAllStakeholdersAll(1000)
+        const duplicate = allStakeholders.some(s => normalizeName(s.name) === normalizeName(formName))
+        if (duplicate) {
+          setNameError('该干系人姓名已存在（全局重复）')
+          alert('该干系人姓名已存在（全局重复）')
+          return
+        }
+      } catch (err) {
+        console.error('重名校验失败', err)
+        // 即使校验失败也允许尝试提交，或者阻断？为了安全起见，如果校验接口失败，暂不阻断，但后端可能没校验
+      }
+    const payload = {
+      name: formName.trim(),
+      role: formRole.trim(),
+      company: formCompany.trim() || undefined,
+      identity_type: formIdentityType || undefined,
+      project_id: formProjectId
+    } as Omit<Stakeholder, 'id' | 'created_at' | 'updated_at'>
+
+      await StakeholderService.createStakeholder(formProjectId, payload)
+      setShowCreateModal(false)
+      await loadStakeholders()
+    } catch (error) {
+      console.error('创建干系人失败:', error)
+      alert('创建干系人失败: ' + (error as Error).message)
+    }
+  }
+
+  const openViewModal = (stakeholder: Stakeholder) => {
+    setSelectedStakeholder(stakeholder)
+    setShowViewModal(true)
+  }
+
+  const openEditModal = (stakeholder: Stakeholder) => {
+    setSelectedStakeholder(stakeholder)
+    setFormProjectId(stakeholder.project_id)
+    setFormName(stakeholder.name || '')
+    setFormRole(stakeholder.role || '')
+    setFormCompany(stakeholder.company || '')
+    setFormIdentityType(stakeholder.identity_type || '')
+    setFormIsResigned(!!stakeholder.is_resigned)
+    setNameError('')
+    setShowEditModal(true)
+  }
+
+  const submitEditStakeholder = async () => {
+    try {
+      if (!selectedStakeholder) return
+      if (!formName.trim()) {
+        alert('请填写干系人姓名')
+        return
+      }
+      // 姓名重复校验（全局，排除自身）
+      try {
+        const allStakeholders = await StakeholderService.getAllStakeholdersAll(1000)
+        const duplicate = allStakeholders.some(s => normalizeName(s.name) === normalizeName(formName) && s.id !== selectedStakeholder.id)
+        if (duplicate) {
+          setNameError('系统已存在相同姓名的干系人（全局唯一）')
+          alert('系统已存在相同姓名的干系人（全局唯一）')
+          return
+        }
+      } catch (err) {
+        console.error('重名校验失败', err)
+      }
+    const updates: Partial<Stakeholder> = {
+      name: formName.trim(),
+      role: formRole.trim(),
+      company: formCompany.trim() || undefined,
+      identity_type: formIdentityType || undefined,
+      is_resigned: formIsResigned
+    }
+      await StakeholderService.updateStakeholder(selectedStakeholder.project_id, selectedStakeholder.id, updates)
+      setShowEditModal(false)
+      setSelectedStakeholder(null)
+      await loadStakeholders()
+    } catch (error) {
+      console.error('更新干系人失败:', error)
+      alert('更新干系人失败: ' + (error as Error).message)
+    }
+  }
+
+  function getIdentityTypeLabel(type?: string) {
+    if (!type) return '-'
+    const found = identityTypes.find(t => t.value === type || t.label === type)
+    if (found?.label) return found.label
+    const alias: Record<string, { label: string; color: string }> = {
+      supplier: { label: '供应商', color: 'bg-blue-100 text-blue-800' },
+      suzhou_tech_equity_service: { label: '苏州科技股权服务', color: 'bg-green-100 text-green-800' },
+      internal: { label: '内部', color: 'bg-gray-100 text-gray-800' },
+    }
+    return alias[type]?.label || type
+  }
+
+  function getIdentityTypeColor(type?: string) {
+    if (!type) return 'bg-gray-100 text-gray-800'
+    const found = identityTypes.find(t => t.value === type || t.label === type)
+    if (found?.color) return found.color
+    const alias: Record<string, { label: string; color: string }> = {
+      supplier: { label: '供应商', color: 'bg-blue-100 text-blue-800' },
+      suzhou_tech_equity_service: { label: '苏州科技股权服务', color: 'bg-green-100 text-green-800' },
+      internal: { label: '内部', color: 'bg-gray-100 text-gray-800' },
+    }
+    return alias[type]?.color || 'bg-gray-100 text-gray-800'
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-6xl mx-auto">
-        {/* 页面标题 */}
-        <div className={cn(
-          'flex justify-between items-center mb-8',
-          isMobile && 'flex-col space-y-3 items-start'
-        )}>
-          <h1 className={cn(
-            'font-bold text-gray-900',
-            isMobile ? 'text-xl' : 'text-3xl'
-          )}>干系人管理</h1>
+    <div className="space-y-6">
+      {/* 页面标题 */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">干系人管理</h1>
+        </div>
+        <div>
           <button
-            onClick={() => setShowCreateModal(true)}
-            className={cn(
-              'bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors',
-              isMobile && 'w-full justify-center'
-            )}
+            onClick={openCreateModal}
+            className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md bg-slate-900 text-white hover:bg-slate-800"
           >
-            <Plus className="w-4 h-4" />
-            添加干系人
+            <Plus className="w-4 h-4 mr-2" /> 新增干系人
+          </button>
+          <button
+            onClick={() => { setIdentityDraft(identityTypes); setShowIdentityModal(true) }}
+            className="inline-flex items-center ml-3 px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-900 hover:bg-gray-50"
+          >
+            <Settings className="w-4 h-4 mr-2" /> 配置身份类型
           </button>
         </div>
+      </div>
 
-        {/* 统计卡片 */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">总干系人数</p>
-                <p className="text-2xl font-bold text-gray-900">{stakeholders.length}</p>
-              </div>
-              <Users className="w-8 h-8 text-gray-600" />
+      {/* 搜索和筛选 */}
+      <div className="bg-white border border-gray-200 rounded-md p-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+          {/* 搜索 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              搜索干系人
+            </label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="搜索姓名、角色或公司..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              />
             </div>
           </div>
-          
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">项目负责人</p>
-                <p className="text-2xl font-bold text-purple-600">{roleStats.owner || 0}</p>
-              </div>
-              <UserCheck className="w-8 h-8 text-purple-600" />
-            </div>
+
+          {/* 类型筛选 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              身份类型
+            </label>
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value as string | '')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">全部类型</option>
+              {identityTypes.map(t => (
+                <option key={t.value} value={t.label}>{t.label}</option>
+              ))}
+            </select>
           </div>
-          
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">团队成员</p>
-                <p className="text-2xl font-bold text-green-600">{roleStats.member || 0}</p>
-              </div>
-              <Users className="w-8 h-8 text-green-600" />
-            </div>
-          </div>
-          
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">客户</p>
-                <p className="text-2xl font-bold text-orange-600">{roleStats.client || 0}</p>
-              </div>
-              <Building className="w-8 h-8 text-orange-600" />
+
+          {/* 统计信息 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              统计信息
+            </label>
+            <div className="flex items-center space-x-2 text-sm text-gray-600">
+              <Users className="w-4 h-4" />
+              <span>共 {filteredStakeholders.length} 个干系人</span>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* 搜索和筛选 */}
-        <div className="bg-white p-4 rounded-lg shadow mb-6">
-          <div className={cn(
-            'flex gap-4',
-            isMobile ? 'flex-col' : 'flex-col md:flex-row'
-          )}>
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+      {/* 干系人列表 */}
+      {loading ? (
+        <div className="bg-white border border-gray-200 rounded-md p-10 text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-sm text-gray-500">加载中...</p>
+        </div>
+      ) : filteredStakeholders.length === 0 ? (
+        <div className="bg-white border border-gray-200 rounded-md p-10 text-center">
+          <Users className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900">暂无干系人</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            {searchQuery || filterType ? '没有找到匹配的干系人' : '暂无干系人'}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredStakeholders.map((stakeholder) => (
+            <div key={stakeholder.id} className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                    {stakeholder.name}
+                    {stakeholder.is_resigned && (
+                      <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200">
+                        离职
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1">{stakeholder.role}</p>
+                </div>
+                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getIdentityTypeColor(stakeholder.identity_type)}`}>
+                  {getIdentityTypeLabel(stakeholder.identity_type || undefined)}
+                </span>
+              </div>
+              
+              <div className="space-y-2 mb-4">
+                <div className="flex items-center text-sm text-gray-600">
+                  <span>{stakeholder.company || '-'}</span>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4 border-t border-gray-100">
+                <button
+                  onClick={() => openViewModal(stakeholder)}
+                  className="px-3 py-1.5 text-sm border border-gray-200 bg-transparent text-gray-600 hover:text-gray-900 hover:border-gray-400 rounded transition-colors"
+                >
+                  查看
+                </button>
+                <button
+                  onClick={() => openEditModal(stakeholder)}
+                  className="px-3 py-1.5 text-sm border border-blue-200 bg-transparent text-blue-600 hover:text-blue-900 hover:border-blue-400 rounded transition-colors"
+                >
+                  编辑
+                </button>
+                <button
+                  onClick={() => handleDeleteStakeholder(stakeholder)}
+                  className="px-3 py-1.5 text-sm border border-red-200 bg-transparent text-red-600 hover:text-red-900 hover:border-red-400 rounded transition-colors"
+                >
+                  删除
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 移除了项目范围的创建/编辑模态框：在干系人页面统一管理 */}
+      {/* 新增干系人模态框 */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-lg">
+            <div className="px-6 py-4 border-b">
+              <h3 className="text-lg font-semibold">新增干系人</h3>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              {/* 已按默认项目赋值，不展示项目选择 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">姓名</label>
                 <input
                   type="text"
-                  placeholder={isMobile ? "搜索干系人..." : "搜索干系人姓名、邮箱或公司..."}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  value={formName}
+                  onChange={(e) => {
+                    setFormName(e.target.value)
+                    if (e.target.value.trim()) {
+                      // 全局重名校验（忽略项目）
+                      const dup = stakeholders.some(s => normalizeName(s.name) === normalizeName(e.target.value))
+                      setNameError(dup ? '系统已存在相同姓名的干系人（全局唯一）' : '')
+                    } else {
+                      setNameError('')
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+                {nameError && <p className="mt-1 text-xs text-red-600">{nameError}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">角色</label>
+                <input
+                  type="text"
+                  value={formRole}
+                  onChange={(e) => setFormRole(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">身份类型</label>
+                <select
+                  value={formIdentityType}
+                  onChange={(e) => setFormIdentityType(e.target.value as string | '')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">未选择</option>
+                  {identityTypes.map(t => (
+                    <option key={t.value} value={t.label}>{t.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center">
+                <input
+                  id="create-resigned"
+                  type="checkbox"
+                  checked={formIsResigned}
+                  onChange={(e) => setFormIsResigned(e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="create-resigned" className="ml-2 block text-sm text-gray-900">
+                  是否已离职
+                </label>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">公司</label>
+                <input
+                  type="text"
+                  value={formCompany}
+                  onChange={(e) => setFormCompany(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
             </div>
-            
-            <div className={cn(
-              'flex gap-3',
-              isMobile && 'flex-col'
-            )}>
-              <select
-                value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value)}
-                className={cn(
-                  'px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent',
-                  isMobile && 'w-full'
-                )}
-              >
-                <option value="all">所有角色</option>
-                <option value="owner">项目负责人</option>
-                <option value="manager">项目经理</option>
-                <option value="member">团队成员</option>
-                <option value="stakeholder">干系人</option>
-                <option value="client">客户</option>
-              </select>
-              
-              <select
-                value={projectFilter}
-                onChange={(e) => setProjectFilter(e.target.value)}
-                className={cn(
-                  'px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent',
-                  isMobile && 'w-full'
-                )}
-              >
-                <option value="all">所有项目</option>
-                {projects.map(project => (
-                  <option key={project.id} value={project.id}>{project.name}</option>
-                ))}
-              </select>
+            <div className="px-6 py-4 border-t flex justify-end space-x-3">
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="px-4 py-2 text-sm rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+              >取消</button>
+              <button
+                onClick={submitCreateStakeholder}
+                className="px-4 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
+                disabled={!!nameError}
+              >保存</button>
             </div>
           </div>
         </div>
+      )}
 
-        {/* 干系人列表 */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          {filteredStakeholders.length === 0 ? (
-            <div className="p-12 text-center">
-              <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">暂无干系人</h3>
-              <p className="text-gray-500 mb-4">添加您的第一个干系人吧</p>
+      {/* 查看干系人模态框 */}
+      {showViewModal && selectedStakeholder && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-lg">
+            <div className="px-6 py-4 border-b">
+              <h3 className="text-lg font-semibold">查看干系人</h3>
+            </div>
+            <div className="px-6 py-4 space-y-3 text-sm text-gray-700">
+              <p><span className="font-medium">姓名：</span>{selectedStakeholder.name}</p>
+              <p><span className="font-medium">角色：</span>{selectedStakeholder.role || '-'}</p>
+              <p><span className="font-medium">身份类型：</span>{selectedStakeholder.identity_type ? getIdentityTypeLabel(selectedStakeholder.identity_type) : '-'}</p>
+              <p><span className="font-medium">公司：</span>{selectedStakeholder.company || '-'}</p>
+              <p><span className="font-medium">所属项目ID：</span>{selectedStakeholder.project_id}</p>
+              <p><span className="font-medium">创建时间：</span>{selectedStakeholder.created_at}</p>
+              <p><span className="font-medium">更新时间：</span>{selectedStakeholder.updated_at}</p>
+            </div>
+            <div className="px-6 py-4 border-t flex justify-end">
               <button
-                onClick={() => setShowCreateModal(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg inline-flex items-center gap-2 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                添加干系人
-              </button>
+                onClick={() => { setShowViewModal(false); setSelectedStakeholder(null) }}
+                className="px-4 py-2 text-sm rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+              >关闭</button>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      姓名
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      角色
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      联系方式
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      公司/部门
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      项目
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      操作
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredStakeholders.map((stakeholder) => (
-                    <tr key={stakeholder.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10">
-                            <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
-                              <Users className="w-5 h-5 text-gray-600" />
-                            </div>
-                          </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">
-                              {stakeholder.name}
-                            </div>
-                            {stakeholder.notes && (
-                              <div className="text-sm text-gray-500">
-                                {stakeholder.notes}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(stakeholder.role)}`}>
-                          {getRoleText(stakeholder.role)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <div className="space-y-1">
-                          {stakeholder.email && (
-                            <div className="flex items-center gap-1">
-                              <Mail className="w-3 h-3 text-gray-400" />
-                              <a href={`mailto:${stakeholder.email}`} className="text-blue-600 hover:text-blue-800">
-                                {stakeholder.email}
-                              </a>
-                            </div>
-                          )}
-                          {stakeholder.phone && (
-                            <div className="flex items-center gap-1">
-                              <Phone className="w-3 h-3 text-gray-400" />
-                              <a href={`tel:${stakeholder.phone}`} className="text-blue-600 hover:text-blue-800">
-                                {stakeholder.phone}
-                              </a>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <div>
-                          {stakeholder.company && (
-                            <div className="font-medium">{stakeholder.company}</div>
-                          )}
-                          {stakeholder.department && (
-                            <div className="text-gray-500">{stakeholder.department}</div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {getProjectName(stakeholder.project_id)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => setEditingStakeholder(stakeholder)}
-                            className="text-blue-600 hover:text-blue-900"
-                            title="编辑"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteStakeholder(stakeholder.id)}
-                            className="text-red-600 hover:text-red-900"
-                            title="删除"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          </div>
         </div>
+      )}
 
-        {/* 创建/编辑干系人模态框 */}
-        {(showCreateModal || editingStakeholder) && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">
-                  {editingStakeholder ? '编辑干系人' : '添加干系人'}
-                </h2>
-                <button
-                  onClick={() => {
-                    setShowCreateModal(false)
-                    setEditingStakeholder(null)
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <UserX className="w-5 h-5" />
-                </button>
+      {/* 编辑干系人模态框 */}
+      {showEditModal && selectedStakeholder && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-lg">
+            <div className="px-6 py-4 border-b">
+              <h3 className="text-lg font-semibold">编辑干系人</h3>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">所属项目（不可更改）</label>
+                <input
+                  type="text"
+                  value={formProjectId}
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
+                />
               </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    姓名 *
-                  </label>
-                  <input
-                    type="text"
-                    value={editingStakeholder ? editingStakeholder.name : newStakeholder.name}
-                    onChange={(e) => {
-                      if (editingStakeholder) {
-                        setEditingStakeholder({ ...editingStakeholder, name: e.target.value })
-                      } else {
-                        setNewStakeholder({ ...newStakeholder, name: e.target.value })
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="输入姓名"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    邮箱
-                  </label>
-                  <input
-                    type="email"
-                    value={editingStakeholder ? editingStakeholder.email || '' : newStakeholder.email}
-                    onChange={(e) => {
-                      if (editingStakeholder) {
-                        setEditingStakeholder({ ...editingStakeholder, email: e.target.value })
-                      } else {
-                        setNewStakeholder({ ...newStakeholder, email: e.target.value })
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="输入邮箱地址"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    电话
-                  </label>
-                  <input
-                    type="tel"
-                    value={editingStakeholder ? editingStakeholder.phone || '' : newStakeholder.phone}
-                    onChange={(e) => {
-                      if (editingStakeholder) {
-                        setEditingStakeholder({ ...editingStakeholder, phone: e.target.value })
-                      } else {
-                        setNewStakeholder({ ...newStakeholder, phone: e.target.value })
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="输入电话号码"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    角色 *
-                  </label>
-                  <select
-                    value={editingStakeholder ? editingStakeholder.role : newStakeholder.role}
-                    onChange={(e) => {
-                      if (editingStakeholder) {
-                        setEditingStakeholder({ ...editingStakeholder, role: e.target.value as any })
-                      } else {
-                        setNewStakeholder({ ...newStakeholder, role: e.target.value as any })
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="owner">项目负责人</option>
-                    <option value="manager">项目经理</option>
-                    <option value="member">团队成员</option>
-                    <option value="stakeholder">干系人</option>
-                    <option value="client">客户</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    公司
-                  </label>
-                  <input
-                    type="text"
-                    value={editingStakeholder ? editingStakeholder.company || '' : newStakeholder.company}
-                    onChange={(e) => {
-                      if (editingStakeholder) {
-                        setEditingStakeholder({ ...editingStakeholder, company: e.target.value })
-                      } else {
-                        setNewStakeholder({ ...newStakeholder, company: e.target.value })
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="输入公司名称"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    部门
-                  </label>
-                  <input
-                    type="text"
-                    value={editingStakeholder ? editingStakeholder.department || '' : newStakeholder.department}
-                    onChange={(e) => {
-                      if (editingStakeholder) {
-                        setEditingStakeholder({ ...editingStakeholder, department: e.target.value })
-                      } else {
-                        setNewStakeholder({ ...newStakeholder, department: e.target.value })
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="输入部门名称"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    关联项目
-                  </label>
-                  <select
-                    value={editingStakeholder ? editingStakeholder.project_id : newStakeholder.project_id}
-                    onChange={(e) => {
-                      if (editingStakeholder) {
-                        setEditingStakeholder({ ...editingStakeholder, project_id: e.target.value })
-                      } else {
-                        setNewStakeholder({ ...newStakeholder, project_id: e.target.value })
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">选择项目</option>
-                    {projects.map(project => (
-                      <option key={project.id} value={project.id}>{project.name}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    备注
-                  </label>
-                  <textarea
-                    value={editingStakeholder ? editingStakeholder.notes || '' : newStakeholder.notes}
-                    onChange={(e) => {
-                      if (editingStakeholder) {
-                        setEditingStakeholder({ ...editingStakeholder, notes: e.target.value })
-                      } else {
-                        setNewStakeholder({ ...newStakeholder, notes: e.target.value })
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    rows={3}
-                    placeholder="输入备注信息"
-                  />
-                </div>
-              </div>
-              
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  onClick={() => {
-                    setShowCreateModal(false)
-                    setEditingStakeholder(null)
-                  }}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={() => {
-                    if (editingStakeholder) {
-                      handleUpdateStakeholder(editingStakeholder.id, editingStakeholder)
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">姓名</label>
+                <input
+                  type="text"
+                  value={formName}
+                  onChange={(e) => {
+                    setFormName(e.target.value)
+                    if (formProjectId && e.target.value.trim()) {
+                      const dup = stakeholders.some(s => normalizeName(s.name) === normalizeName(e.target.value) && s.id !== selectedStakeholder.id)
+                      setNameError(dup ? '该项目下已存在相同姓名的干系人' : '')
                     } else {
-                      handleCreateStakeholder()
+                      setNameError('')
                     }
                   }}
-                  disabled={editingStakeholder ? !editingStakeholder.name : !newStakeholder.name}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+                {nameError && <p className="mt-1 text-xs text-red-600">{nameError}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">角色</label>
+                <input
+                  type="text"
+                  value={formRole}
+                  onChange={(e) => setFormRole(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">身份类型</label>
+                <select
+                  value={formIdentityType}
+                  onChange={(e) => setFormIdentityType(e.target.value as string | '')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 >
-                  {editingStakeholder ? '更新' : '创建'}
-                </button>
+                  <option value="">未选择</option>
+                  {identityTypes.map(t => (
+                    <option key={t.value} value={t.label}>{t.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center">
+                <input
+                  id="edit-resigned"
+                  type="checkbox"
+                  checked={formIsResigned}
+                  onChange={(e) => setFormIsResigned(e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="edit-resigned" className="ml-2 block text-sm text-gray-900">
+                  是否已离职
+                </label>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">公司</label>
+                <input
+                  type="text"
+                  value={formCompany}
+                  onChange={(e) => setFormCompany(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
               </div>
             </div>
+            <div className="px-6 py-4 border-t flex justify-end space-x-3">
+              <button
+                onClick={() => { setShowEditModal(false); setSelectedStakeholder(null) }}
+                className="px-4 py-2 text-sm rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+              >取消</button>
+              <button
+                onClick={submitEditStakeholder}
+                className="px-4 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
+                disabled={!!nameError}
+              >保存</button>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* 身份类型配置模态框 */}
+      {showIdentityModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl">
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <h3 className="text-lg font-semibold">身份类型配置</h3>
+              <button onClick={() => setShowIdentityModal(false)} className="text-gray-600 hover:text-gray-900">×</button>
+            </div>
+            <div className="px-6 py-4">
+              <p className="text-sm text-gray-500 mb-3">添加或编辑身份类型名称；系统将自动生成值并使用默认颜色。</p>
+              <div className="space-y-3">
+                {identityDraft.map((item, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-3 items-center">
+                    <div className="col-span-11">
+                      <label className="block text-xs text-gray-500">类型名称</label>
+                      <input
+                        value={item.label}
+                        onChange={e => setIdentityDraft(prev => prev.map((it, i) => i === idx ? { ...it, label: e.target.value } : it))}
+                        className="w-full px-2 py-1 border rounded"
+                        placeholder="例如：供应商"
+                      />
+                    </div>
+                    <div className="col-span-1">
+                      <button onClick={() => setIdentityDraft(prev => prev.filter((_, i) => i !== idx))} className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded">删除</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4">
+                <button onClick={() => setIdentityDraft(prev => [...prev, { value: '', label: '', color: 'bg-gray-100 text-gray-800' }])} className="px-3 py-2 text-sm bg-gray-100 text-gray-800 rounded hover:bg-gray-200">添加类型</button>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t flex justify-end space-x-3">
+              <button onClick={() => setShowIdentityModal(false)} className="px-4 py-2 text-sm rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50">取消</button>
+              <button onClick={() => {
+                // 仅根据名称保存：自动生成 value，使用默认颜色
+                const slugify = (s: string) => {
+                  const raw = s.trim()
+                  const ascii = raw
+                    .toLowerCase()
+                    .replace(/\s+/g, '_')
+                    .replace(/[^a-z0-9_\-]/g, '')
+                  // 对于非拉丁字符（如中文），ascii 可能为空，回退为原始名称
+                  return ascii || raw
+                }
+
+                const cleaned = identityDraft
+                  .map(i => ({
+                    label: i.label.trim(),
+                    value: (i.value || '').trim() || slugify(i.label),
+                    color: (i.color || 'bg-gray-100 text-gray-800').trim()
+                  }))
+                  .filter(i => i.label)
+
+                const setVals = new Set(cleaned.map(i => i.value))
+                if (setVals.size !== cleaned.length) {
+                  alert('身份类型名称生成的值存在重复，请调整名称')
+                  return
+                }
+                saveIdentityTypesConfig(cleaned)
+                setShowIdentityModal(false)
+              }} className="px-4 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700">保存</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

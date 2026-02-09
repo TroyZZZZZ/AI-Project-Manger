@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人效能与工时管理 | Personal Efficiency Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Inter', 'Noto Sans SC', system-ui, sans-serif; 
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #E5E7EB;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #D1D5DB;
+        }
+
+        /* Animations */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+        }
+        .animate-pulse-ring {
+            animation: pulse-ring 2s infinite;
+        }
+
+        @keyframes confetti-fall {
+            0% { transform: translateY(-100%) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+        }
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            background-color: #f00;
+            z-index: 9999;
+            animation: confetti-fall 3s linear forwards;
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#EEF2FF',
+                            100: '#E0E7FF',
+                            500: '#6366F1',
+                            600: '#4F46E5',
+                            700: '#4338CA',
+                        },
+                        dark: {
+                            900: '#111827',
+                            800: '#1F2937',
+                            50: '#F9FAFB'
+                        }
+                    },
+                    boxShadow: {
+                        'soft': '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02)',
+                        'card': '0 0 0 1px rgba(0,0,0,0.03), 0 2px 8px rgba(0,0,0,0.04)',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 text-gray-900 h-screen flex overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white border-r border-gray-200 flex-shrink-0 hidden md:flex flex-col">
+        <div class="p-5 flex items-center gap-3 border-b border-gray-100">
+            <div class="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-brand-500/30">
+                <i class="fas fa-bolt"></i>
+            </div>
+            <h1 class="font-bold text-gray-800 text-lg tracking-tight">FocusFlow</h1>
+        </div>
+
+        <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+            <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-3">工作台</div>
+            <a href="#" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md bg-brand-50 text-brand-700">
+                <i class="fas fa-stopwatch w-5 text-center"></i>
+                工时登记台
+            </a>
+            <a href="#" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900">
+                <i class="fas fa-chart-pie w-5 text-center"></i>
+                效能仪表盘
+            </a>
+            <a href="#" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900">
+                <i class="fas fa-trophy w-5 text-center"></i>
+                成就小目标
+            </a>
+
+            <div class="mt-8 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-3">项目视图</div>
+            <a href="#" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900">
+                <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                赵聪项目管理
+            </a>
+            <a href="#" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                个人效能工具
+            </a>
+            <a href="#" class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900">
+                <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                年度复盘
+            </a>
+        </nav>
+
+        <div class="p-4 border-t border-gray-100">
+            <div class="flex items-center gap-3 px-3 py-2">
+                <img src="https://ui-avatars.com/api/?name=Zhao+Cong&background=random" class="w-8 h-8 rounded-full border border-gray-200">
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-900 truncate">赵聪</p>
+                    <p class="text-xs text-gray-500 truncate">产品经理</p>
+                </div>
+                <button class="text-gray-400 hover:text-gray-600"><i class="fas fa-cog"></i></button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col min-w-0 bg-gray-50">
+        <!-- Header -->
+        <header class="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 sticky top-0 z-10">
+            <div class="flex items-center gap-4">
+                <button class="md:hidden text-gray-500"><i class="fas fa-bars"></i></button>
+                <h2 class="text-lg font-semibold text-gray-800">工时登记台</h2>
+                <span class="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    <i class="fas fa-circle text-[8px] mr-1.5 animate-pulse"></i> 实时同步中
+                </span>
+            </div>
+            
+            <div class="flex items-center gap-4">
+                <!-- Global Timer Status (Compact) -->
+                <div id="global-timer-widget" class="hidden items-center gap-3 bg-brand-50 border border-brand-100 px-3 py-1.5 rounded-full">
+                    <span class="relative flex h-3 w-3">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-3 w-3 bg-brand-500"></span>
+                    </span>
+                    <span class="text-sm font-medium text-brand-700 font-mono" id="global-timer-display">00:45:12</span>
+                    <button onclick="stopTask()" class="text-xs bg-white text-brand-600 border border-brand-200 px-2 py-0.5 rounded hover:bg-brand-50 transition-colors">
+                        <i class="fas fa-stop"></i>
+                    </button>
+                </div>
+                
+                <button class="relative p-2 text-gray-400 hover:text-gray-600">
+                    <i class="far fa-bell"></i>
+                    <span class="absolute top-1.5 right-1.5 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"></span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Content Scroll Area -->
+        <div class="flex-1 overflow-y-auto p-4 md:p-8">
+            <div class="max-w-6xl mx-auto space-y-8">
+                
+                <!-- Section 1: Active Task / Switcher (The Hero) -->
+                <section>
+                    <div class="bg-white rounded-xl shadow-card border border-gray-200 overflow-hidden relative">
+                        <!-- Active Task State -->
+                        <div id="active-task-panel" class="p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">开发</span>
+                                    <span class="text-xs text-gray-500 flex items-center gap-1"><i class="fas fa-folder text-gray-400"></i> 赵聪项目管理</span>
+                                </div>
+                                <h2 class="text-2xl font-bold text-gray-900 mb-1 flex items-center gap-3">
+                                    UI 原型开发与实现
+                                    <i class="fas fa-pen text-gray-300 text-sm hover:text-gray-500 cursor-pointer"></i>
+                                </h2>
+                                <p class="text-gray-500 text-sm">正在编写 HTML/Tailwind CSS 代码...</p>
+                            </div>
+                            
+                            <div class="flex items-center gap-6">
+                                <div class="text-right">
+                                    <div class="text-4xl font-mono font-bold text-gray-900 tracking-tight" id="main-timer">00:45:12</div>
+                                    <div class="text-xs text-gray-400 mt-1">开始于 09:30 AM</div>
+                                </div>
+                                <div class="flex flex-col gap-2">
+                                    <button onclick="togglePause()" id="btn-pause" class="w-full px-6 py-2.5 bg-yellow-50 text-yellow-600 font-medium rounded-lg hover:bg-yellow-100 transition-colors border border-yellow-100 flex items-center justify-center gap-2">
+                                        <i class="fas fa-pause"></i> 暂停
+                                    </button>
+                                    <button onclick="stopTask()" class="w-full px-6 py-2.5 bg-red-50 text-red-600 font-medium rounded-lg hover:bg-red-100 transition-colors border border-red-100 flex items-center justify-center gap-2">
+                                        <i class="fas fa-stop"></i> 结束
+                                    </button>
+                                    <button onclick="openInterruptModal()" class="w-full px-6 py-2.5 bg-brand-600 text-white font-medium rounded-lg hover:bg-brand-700 shadow-lg shadow-brand-500/30 transition-all flex items-center justify-center gap-2 animate-pulse-ring">
+                                        <i class="fas fa-bolt"></i> 插入突发任务
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stacked/Paused Tasks (Hidden by default, shown when items exist) -->
+                        <div id="task-stack" class="hidden bg-gray-50 border-t border-gray-200 px-6 py-3">
+                            <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">已挂起任务 (Task Stack)</div>
+                            <div class="space-y-2">
+                                <div class="flex items-center justify-between bg-white p-3 rounded border border-gray-200 shadow-sm opacity-75 hover:opacity-100 transition-opacity cursor-pointer">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded bg-orange-100 text-orange-600 flex items-center justify-center">
+                                            <i class="fas fa-pause"></i>
+                                        </div>
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-800">周报撰写</div>
+                                            <div class="text-xs text-gray-500">已用时 00:20:00 · 个人效能工具</div>
+                                        </div>
+                                    </div>
+                                    <button class="text-xs text-brand-600 font-medium hover:underline">恢复任务</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Idle State (Hidden when active) -->
+                    <div id="idle-panel" class="hidden bg-white rounded-xl shadow-card border border-gray-200 p-8 text-center">
+                        <div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
+                            <i class="fas fa-coffee text-2xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-900 mb-2">准备好开始工作了吗？</h3>
+                        <p class="text-gray-500 mb-6 max-w-md mx-auto">选择一个任务开始计时，或者快速创建新的记录。</p>
+                        <button onclick="startNewTask()" class="px-8 py-3 bg-brand-600 text-white font-medium rounded-lg hover:bg-brand-700 shadow-lg shadow-brand-500/30 transition-all">
+                            <i class="fas fa-play mr-2"></i> 开始新任务
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Section 2: Stats & Goals Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Progress Card -->
+                    <div class="bg-white rounded-xl shadow-card border border-gray-200 p-6 md:col-span-2">
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="font-bold text-gray-800">今日概览</h3>
+                            <div class="text-sm text-gray-500">2026年1月19日</div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+                            <div class="p-4 rounded-lg bg-gray-50 border border-gray-100">
+                                <div class="text-sm text-gray-500 mb-1">总工时</div>
+                                <div class="text-2xl font-bold text-gray-900">6.5 <span class="text-sm font-normal text-gray-400">小时</span></div>
+                                <div class="text-xs text-green-600 mt-1"><i class="fas fa-arrow-up"></i> 较昨日 +1.2h</div>
+                            </div>
+                            <div class="p-4 rounded-lg bg-gray-50 border border-gray-100">
+                                <div class="text-sm text-gray-500 mb-1">完成任务</div>
+                                <div class="text-2xl font-bold text-gray-900">4 <span class="text-sm font-normal text-gray-400">个</span></div>
+                                <div class="text-xs text-gray-400 mt-1">含 1 个紧急任务</div>
+                            </div>
+                            <div class="p-4 rounded-lg bg-gray-50 border border-gray-100">
+                                <div class="text-sm text-gray-500 mb-1">效能评分</div>
+                                <div class="text-2xl font-bold text-brand-600">85 <span class="text-sm font-normal text-gray-400">/ 100</span></div>
+                                <div class="text-xs text-gray-400 mt-1">专注度极佳</div>
+                            </div>
+                        </div>
+
+                        <!-- Visualization Bar -->
+                        <div>
+                            <div class="flex justify-between text-xs text-gray-500 mb-2">
+                                <span>时间分布</span>
+                                <span>目标: 8小时</span>
+                            </div>
+                            <div class="h-4 bg-gray-100 rounded-full overflow-hidden flex">
+                                <div class="h-full bg-blue-500 w-[40%]" title="赵聪项目管理 (40%)"></div>
+                                <div class="h-full bg-emerald-500 w-[25%]" title="个人效能工具 (25%)"></div>
+                                <div class="h-full bg-orange-400 w-[15%]" title="会议 (15%)"></div>
+                            </div>
+                            <div class="flex gap-4 mt-3">
+                                <div class="flex items-center gap-1.5 text-xs text-gray-600">
+                                    <span class="w-2 h-2 rounded-full bg-blue-500"></span> 赵聪项目管理
+                                </div>
+                                <div class="flex items-center gap-1.5 text-xs text-gray-600">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 个人效能工具
+                                </div>
+                                <div class="flex items-center gap-1.5 text-xs text-gray-600">
+                                    <span class="w-2 h-2 rounded-full bg-orange-400"></span> 会议
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Goals Card -->
+                    <div class="bg-white rounded-xl shadow-card border border-gray-200 p-6 flex flex-col">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-bold text-gray-800">成就小目标</h3>
+                            <button onclick="triggerReward()" class="text-xs text-brand-600 hover:text-brand-800 font-medium">查看全部</button>
+                        </div>
+                        
+                        <div class="flex-1 space-y-5">
+                            <!-- Goal 1 -->
+                            <div>
+                                <div class="flex justify-between text-sm mb-1.5">
+                                    <span class="font-medium text-gray-700">今日工时 > 8h</span>
+                                    <span class="text-gray-500 font-mono">6.5/8</span>
+                                </div>
+                                <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                                    <div class="h-full bg-brand-500 rounded-full" style="width: 81%"></div>
+                                </div>
+                                <p class="text-xs text-gray-400 mt-1">加油，还差 1.5 小时！</p>
+                            </div>
+
+                            <!-- Goal 2 -->
+                            <div>
+                                <div class="flex justify-between text-sm mb-1.5">
+                                    <span class="font-medium text-gray-700">无会议专注时段</span>
+                                    <span class="text-green-600 font-medium"><i class="fas fa-check-circle"></i> 已达成</span>
+                                </div>
+                                <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                                    <div class="h-full bg-green-500 rounded-full" style="width: 100%"></div>
+                                </div>
+                            </div>
+                            
+                            <!-- Daily Badge -->
+                            <div class="mt-auto pt-4 border-t border-gray-100 flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600 text-lg">
+                                    <i class="fas fa-medal"></i>
+                                </div>
+                                <div>
+                                    <div class="text-sm font-bold text-gray-800">早起鸟勋章</div>
+                                    <div class="text-xs text-gray-500">已连续打卡 5 天</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: Recent Activity Log -->
+                <section>
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-gray-800 text-lg">近期记录</h3>
+                        <button class="text-sm text-gray-500 hover:text-gray-900">查看历史 <i class="fas fa-chevron-right text-xs"></i></button>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-card border border-gray-200 overflow-hidden">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-gray-50 text-gray-500 border-b border-gray-200">
+                                <tr>
+                                    <th class="px-6 py-3 font-medium">项目/任务</th>
+                                    <th class="px-6 py-3 font-medium">标签</th>
+                                    <th class="px-6 py-3 font-medium">时间段</th>
+                                    <th class="px-6 py-3 font-medium text-right">时长</th>
+                                    <th class="px-6 py-3 font-medium text-right">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                <tr class="hover:bg-gray-50 group">
+                                    <td class="px-6 py-4">
+                                        <div class="font-medium text-gray-900">需求文档编写</div>
+                                        <div class="text-xs text-gray-500">赵聪项目管理</div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">文档</span>
+                                    </td>
+                                    <td class="px-6 py-4 text-gray-500 font-mono">14:00 - 15:30</td>
+                                    <td class="px-6 py-4 text-right font-medium text-gray-900 font-mono">1h 30m</td>
+                                    <td class="px-6 py-4 text-right">
+                                        <button class="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"><i class="fas fa-edit"></i></button>
+                                    </td>
+                                </tr>
+                                <tr class="hover:bg-gray-50 group">
+                                    <td class="px-6 py-4">
+                                        <div class="font-medium text-gray-900">团队周会</div>
+                                        <div class="text-xs text-gray-500">部门日常</div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">会议</span>
+                                    </td>
+                                    <td class="px-6 py-4 text-gray-500 font-mono">10:00 - 11:00</td>
+                                    <td class="px-6 py-4 text-right font-medium text-gray-900 font-mono">1h 00m</td>
+                                    <td class="px-6 py-4 text-right">
+                                        <button class="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"><i class="fas fa-edit"></i></button>
+                                    </td>
+                                </tr>
+                                <tr class="hover:bg-gray-50 group">
+                                    <td class="px-6 py-4">
+                                        <div class="font-medium text-gray-900">前端架构调研</div>
+                                        <div class="text-xs text-gray-500">个人效能工具</div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">调研</span>
+                                    </td>
+                                    <td class="px-6 py-4 text-gray-500 font-mono">09:00 - 09:45</td>
+                                    <td class="px-6 py-4 text-right font-medium text-gray-900 font-mono">45m</td>
+                                    <td class="px-6 py-4 text-right">
+                                        <button class="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"><i class="fas fa-edit"></i></button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal: Interrupt / New Task -->
+    <div id="task-modal" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm hidden z-50 flex items-center justify-center opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 transform scale-95 transition-transform duration-300" id="modal-content">
+            <div class="flex items-center justify-between p-6 border-b border-gray-100">
+                <h3 class="text-lg font-bold text-gray-900" id="modal-title">插入突发任务</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <div class="p-6 space-y-4">
+                <!-- Alert for interruption -->
+                <div id="interrupt-alert" class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-3">
+                    <i class="fas fa-pause-circle text-yellow-600 mt-0.5"></i>
+                    <div>
+                        <p class="text-sm font-medium text-yellow-800">当前任务将被挂起</p>
+                        <p class="text-xs text-yellow-600 mt-0.5">"UI 原型开发与实现" 将暂停计时，您可以在完成后随时恢复。</p>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">任务来源</label>
+                    <div class="grid grid-cols-3 gap-2 mb-3">
+                        <button type="button" onclick="setSourceType('project')" id="btn-source-project" class="px-3 py-2 text-sm font-medium rounded-lg border border-brand-200 bg-brand-50 text-brand-700 ring-2 ring-brand-500 ring-offset-1 transition-all">项目故事</button>
+                        <button type="button" onclick="setSourceType('program')" id="btn-source-program" class="px-3 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-all">项目集故事</button>
+                        <button type="button" onclick="setSourceType('followup')" id="btn-source-followup" class="px-3 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-all">跟进事项</button>
+                    </div>
+                    
+                    <label class="block text-sm font-medium text-gray-700 mb-1">选择具体事项</label>
+                    <div class="relative">
+                        <select id="task-selector" class="w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none appearance-none bg-white transition-shadow truncate">
+                            <!-- Options will be populated by JS -->
+                        </select>
+                        <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500">
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1" id="task-source-hint">从"赵聪项目管理"中拉取待办项目故事</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">所属项目</label>
+                        <select class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none bg-white">
+                            <option>赵聪项目管理</option>
+                            <option>个人效能工具</option>
+                            <option>临时事务</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">标签</label>
+                        <select class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none bg-white">
+                            <option>会议</option>
+                            <option>开发</option>
+                            <option>文档</option>
+                            <option>Bug修复</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50 rounded-b-xl">
+                <button onclick="closeModal()" class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900">取消</button>
+                <button onclick="startInterruptTask()" class="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 shadow-sm">立即开始</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Achievement Toast -->
+    <div id="achievement-toast" class="fixed bottom-8 right-8 bg-gray-900 text-white px-6 py-4 rounded-xl shadow-2xl transform translate-y-20 opacity-0 transition-all duration-500 z-50 flex items-center gap-4">
+        <div class="text-3xl">🎉</div>
+        <div>
+            <h4 class="font-bold text-white">目标达成！</h4>
+            <p class="text-sm text-gray-300">恭喜！今日工时已达标。</p>
+        </div>
+    </div>
+
+    <script>
+        // Mock Data
+        const mockData = {
+            project: [
+                "用户登录功能开发 - 赵聪项目管理",
+                "报表导出优化 - 个人效能工具",
+                "支付接口对接 - 电商平台二期",
+                "首页 UI 焕新 - 官网改版",
+                "权限管理模块重构 - 内部系统"
+            ],
+            program: [
+                "Q1 效能提升计划 - 基础设施升级",
+                "2026 年度安全合规审计 - 安全专项",
+                "跨部门协作流程优化 - 组织变革",
+                "核心系统云原生改造 - 技术架构"
+            ],
+            followup: [
+                "与设计团队确认 UI 细节 - 待办",
+                "修复线上紧急 Bug #1024 - 进行中",
+                "跟进服务器扩容进度 - 阻塞",
+                "准备周五演示 PPT - 待办"
+            ]
+        };
+
+        let currentSourceType = 'project';
+
+        function setSourceType(type) {
+            currentSourceType = type;
+            
+            // Update Buttons UI
+            ['project', 'program', 'followup'].forEach(t => {
+                const btn = document.getElementById(`btn-source-${t}`);
+                if (t === type) {
+                    btn.className = "px-3 py-2 text-sm font-medium rounded-lg border border-brand-200 bg-brand-50 text-brand-700 ring-2 ring-brand-500 ring-offset-1 transition-all";
+                } else {
+                    btn.className = "px-3 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-all";
+                }
+            });
+
+            // Update Hint
+            const hints = {
+                project: '从"赵聪项目管理"中拉取待办项目故事',
+                program: '从项目集层级拉取战略故事',
+                followup: '从个人的跟进事项列表中拉取'
+            };
+            document.getElementById('task-source-hint').innerText = hints[type];
+
+            // Populate Select
+            const select = document.getElementById('task-selector');
+            select.innerHTML = '';
+            mockData[type].forEach(item => {
+                const option = document.createElement('option');
+                option.value = item;
+                option.innerText = item;
+                select.appendChild(option);
+            });
+        }
+
+        // Initialize with default source
+        setSourceType('project');
+
+        // Simple Logic for Prototype Interaction
+        
+        let timerInterval;
+        let seconds = 2712; // Start from some random time
+        let isTaskRunning = true;
+        let isPaused = false;
+
+        function formatTime(totalSeconds) {
+            const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+            const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+            const s = (totalSeconds % 60).toString().padStart(2, '0');
+            return `${h}:${m}:${s}`;
+        }
+
+        function updateTimer() {
+            if (!isTaskRunning || isPaused) return;
+            seconds++;
+            document.getElementById('main-timer').innerText = formatTime(seconds);
+            document.getElementById('global-timer-display').innerText = formatTime(seconds);
+        }
+
+        // Start Timer on Load
+        timerInterval = setInterval(updateTimer, 1000);
+
+        // UI Interactions
+        function togglePause() {
+            isPaused = !isPaused;
+            const btn = document.getElementById('btn-pause');
+            const statusText = document.querySelector('#active-task-panel p');
+            const timerDisplay = document.getElementById('main-timer');
+
+            if (isPaused) {
+                // Pause State
+                btn.innerHTML = '<i class="fas fa-play"></i> 继续';
+                btn.className = "w-full px-6 py-2.5 bg-green-50 text-green-600 font-medium rounded-lg hover:bg-green-100 transition-colors border border-green-100 flex items-center justify-center gap-2";
+                statusText.innerText = "任务已暂停 (午休/中断)...";
+                statusText.classList.add("text-yellow-600", "font-medium");
+                timerDisplay.classList.add("opacity-50");
+            } else {
+                // Resume State
+                btn.innerHTML = '<i class="fas fa-pause"></i> 暂停';
+                btn.className = "w-full px-6 py-2.5 bg-yellow-50 text-yellow-600 font-medium rounded-lg hover:bg-yellow-100 transition-colors border border-yellow-100 flex items-center justify-center gap-2";
+                statusText.innerText = "正在编写 HTML/Tailwind CSS 代码...";
+                statusText.classList.remove("text-yellow-600", "font-medium");
+                timerDisplay.classList.remove("opacity-50");
+            }
+        }
+
+        function stopTask() {
+            isTaskRunning = false;
+            isPaused = false;
+            clearInterval(timerInterval);
+            document.getElementById('active-task-panel').classList.add('hidden');
+            document.getElementById('idle-panel').classList.remove('hidden');
+            document.getElementById('global-timer-widget').classList.add('hidden');
+            document.getElementById('global-timer-widget').classList.remove('flex');
+            
+            // Show confetti for fun
+            triggerConfetti();
+        }
+
+        function startNewTask() {
+            openModal(false);
+        }
+
+        function openInterruptModal() {
+            openModal(true);
+        }
+
+        function openModal(isInterrupt) {
+            const modal = document.getElementById('task-modal');
+            const content = document.getElementById('modal-content');
+            const alert = document.getElementById('interrupt-alert');
+            const title = document.getElementById('modal-title');
+
+            modal.classList.remove('hidden');
+            // Trigger reflow
+            void modal.offsetWidth;
+            modal.classList.remove('opacity-0');
+            content.classList.remove('scale-95');
+
+            if (isInterrupt) {
+                alert.classList.remove('hidden');
+                title.innerText = "插入突发任务";
+            } else {
+                alert.classList.add('hidden');
+                title.innerText = "开始新任务";
+            }
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('task-modal');
+            const content = document.getElementById('modal-content');
+            
+            modal.classList.add('opacity-0');
+            content.classList.add('scale-95');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        function startInterruptTask() {
+            // Simulate switching
+            closeModal();
+            
+            const taskSelector = document.getElementById('task-selector');
+            const taskName = taskSelector.value || "未命名任务";
+            
+            // If interrupting, show stack
+            const stack = document.getElementById('task-stack');
+            stack.classList.remove('hidden');
+            
+            // Reset timer
+            seconds = 0;
+            isTaskRunning = true;
+            document.getElementById('main-timer').innerText = "00:00:00";
+            
+            // Update UI
+            document.getElementById('idle-panel').classList.add('hidden');
+            document.getElementById('active-task-panel').classList.remove('hidden');
+            
+            // Update Text
+            const titleEl = document.querySelector('#active-task-panel h2');
+            titleEl.innerHTML = `${taskName} <i class="fas fa-pen text-gray-300 text-sm hover:text-gray-500 cursor-pointer"></i>`;
+        }
+
+        function triggerReward() {
+            triggerConfetti();
+            const toast = document.getElementById('achievement-toast');
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        function triggerConfetti() {
+            const colors = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#6366F1'];
+            for (let i = 0; i < 50; i++) {
+                const conf = document.createElement('div');
+                conf.classList.add('confetti');
+                conf.style.left = Math.random() * 100 + 'vw';
+                conf.style.top = '-10px';
+                conf.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                conf.style.animationDuration = (Math.random() * 2 + 1) + 's';
+                document.body.appendChild(conf);
+                
+                setTimeout(() => conf.remove(), 3000);
+            }
+        }
+    </script>
+</body>
+</html>

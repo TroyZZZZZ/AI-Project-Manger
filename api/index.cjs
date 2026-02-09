@@ -8,17 +8,32 @@
 require('dotenv').config();
 const app = require('./app.cjs');
 const { db } = require('./lib/database.cjs');
+const { dbValidator } = require('./utils/dbValidator.cjs');
 
 const PORT = process.env.PORT || 3001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
+const SKIP_DB_ON_START = process.env.SKIP_DB_ON_START === 'true';
 
 // 启动服务器
 const startServer = async () => {
   try {
-    // 测试数据库连接
-    console.log('🔍 正在测试数据库连接...');
-    await db.testConnection();
-    console.log('✅ 数据库连接成功');
+    if (!SKIP_DB_ON_START) {
+      // 测试数据库连接
+      console.log('🔍 正在测试数据库连接...');
+      await db.testConnection();
+      console.log('✅ 数据库连接成功');
+
+      // 初始化数据库字段验证器
+      console.log('🔍 正在初始化数据库字段验证器...');
+      await dbValidator.initialize();
+      console.log('✅ 数据库字段验证器初始化完成');
+
+      console.log('🔍 正在初始化干系人全局唯一约束...');
+      await db.ensureStakeholderGlobalUniqueName();
+      console.log('✅ 干系人全局唯一约束初始化完成');
+    } else {
+      console.log('⚠️ 跳过数据库连接与字段验证初始化（开发模式）');
+    }
     
     // 启动HTTP服务器
     const server = app.listen(PORT, () => {

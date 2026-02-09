@@ -3,26 +3,19 @@ import { RouterProvider } from 'react-router-dom'
 import { router } from './router'
 import { useAppStore } from './stores/useAppStore'
 
+console.log('App.tsx: 组件开始加载')
+
 function App() {
-  const { theme, initializeApp } = useAppStore()
+  console.log('App.tsx: App组件渲染开始')
+  const { initializeApp } = useAppStore()
 
   useEffect(() => {
-    // 初始化应用
+    console.log('App.tsx: useEffect 触发，开始初始化应用')
     initializeApp()
-    
-    // 应用主题
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
-  }, [theme, initializeApp])
+  }, [initializeApp])
 
-  return (
-    <div className={theme}>
-      <RouterProvider router={router} />
-    </div>
-  )
+  console.log('App.tsx: 返回RouterProvider')
+  return <RouterProvider router={router} />
 }
 
 export default App

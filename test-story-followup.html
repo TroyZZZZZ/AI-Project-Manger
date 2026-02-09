@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>故事跟进功能测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .result { margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 3px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        button { padding: 8px 16px; margin: 5px; cursor: pointer; }
+        input, select { padding: 5px; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>故事跟进功能测试</h1>
+    
+    <div class="test-section">
+        <h3>1. 获取跟进中的故事列表</h3>
+        <button onclick="testGetFollowingStories()">测试获取跟进故事</button>
+        <div id="result-following" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>2. 设置提醒日期</h3>
+        <input type="number" id="story-id-reminder" placeholder="故事ID" value="1">
+        <input type="date" id="reminder-date">
+        <button onclick="testSetReminderDate()">设置提醒日期</button>
+        <div id="result-reminder" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>3. 创建跟进记录</h3>
+        <input type="number" id="story-id-record" placeholder="故事ID" value="1">
+        <input type="text" id="record-content" placeholder="跟进内容">
+        <input type="text" id="record-type" placeholder="跟进类型（可选）">
+        <button onclick="testCreateFollowUpRecord()">创建跟进记录</button>
+        <div id="result-record" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>4. 获取跟进记录</h3>
+        <input type="number" id="story-id-records" placeholder="故事ID" value="1">
+        <button onclick="testGetFollowUpRecords()">获取跟进记录</button>
+        <div id="result-records" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3001/api';
+
+        function showResult(elementId, data, isSuccess = true) {
+            const element = document.getElementById(elementId);
+            element.className = `result ${isSuccess ? 'success' : 'error'}`;
+            element.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+        }
+
+        async function testGetFollowingStories() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/stories/following`);
+                const data = await response.json();
+                showResult('result-following', data, response.ok);
+            } catch (error) {
+                showResult('result-following', error.message, false);
+            }
+        }
+
+        async function testSetReminderDate() {
+            const storyId = document.getElementById('story-id-reminder').value;
+            const reminderDate = document.getElementById('reminder-date').value;
+
+            if (!reminderDate) {
+                showResult('result-reminder', '请选择提醒日期', false);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/stories/${storyId}/next-reminder-date`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ next_reminder_date: reminderDate }),
+                });
+                const data = await response.json();
+                showResult('result-reminder', data, response.ok);
+            } catch (error) {
+                showResult('result-reminder', error.message, false);
+            }
+        }
+
+        async function testCreateFollowUpRecord() {
+            const storyId = document.getElementById('story-id-record').value;
+            const content = document.getElementById('record-content').value;
+            const type = document.getElementById('record-type').value;
+
+            if (!content) {
+                showResult('result-record', '请输入跟进内容', false);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/stories/${storyId}/follow-up-records`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        content: content,
+                        follow_up_type: type || undefined
+                    }),
+                });
+                const data = await response.json();
+                showResult('result-record', data, response.ok);
+            } catch (error) {
+                showResult('result-record', error.message, false);
+            }
+        }
+
+        async function testGetFollowUpRecords() {
+            const storyId = document.getElementById('story-id-records').value;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/stories/${storyId}/follow-up-records`);
+                const data = await response.json();
+                showResult('result-records', data, response.ok);
+            } catch (error) {
+                showResult('result-records', error.message, false);
+            }
+        }
+
+        // 设置默认日期为明天
+        document.getElementById('reminder-date').valueAsDate = new Date(Date.now() + 86400000);
+    </script>
+</body>
+</html>

@@ -26,23 +26,16 @@ export class ApiClient {
     return ApiClient.instance;
   }
 
-  // 获取认证token
-  private getAuthToken(): string | null {
-    return localStorage.getItem('token');
-  }
-
-  // 通用请求方法
+  // 通用请求方法 - 单用户系统，无需认证
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
-    const token = this.getAuthToken();
     const url = `${this.baseUrl}${endpoint}`;
     
     const config: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
         ...options.headers,
       },
       ...options,
@@ -50,13 +43,31 @@ export class ApiClient {
 
     try {
       const response = await fetch(url, config);
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || `HTTP error! status: ${response.status}`);
+      const contentType = response.headers.get('content-type') || '';
+      const rawText = await response.text();
+      let parsed: any = undefined;
+
+      if (contentType.includes('application/json') && rawText.trim() !== '') {
+        try {
+          parsed = JSON.parse(rawText);
+        } catch (e) {
+          parsed = { message: rawText };
+        }
       }
-      
-      return data;
+
+      if (!response.ok) {
+        const msg = (parsed && (parsed.message || parsed.error)) || rawText || response.statusText;
+        throw new Error(`[${response.status}] ${msg}`);
+      }
+
+      if (parsed && typeof parsed === 'object' && 'success' in parsed) {
+        return parsed as ApiResponse<T>;
+      }
+
+      return {
+        success: true,
+        data: parsed !== undefined ? (parsed as T) : undefined,
+      } as ApiResponse<T>;
     } catch (error) {
       console.error('API请求错误:', error);
       throw error;
@@ -84,9 +95,25 @@ export class ApiClient {
     });
   }
 
-  // DELETE请求
-  async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { method: 'DELETE' });
+  // PATCH方法
+  async patch<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, {
+      method: 'PATCH',
+      body: data ? JSON.stringify(data) : undefined,
+    });
+  }
+
+  // DELETE方法
+  async delete<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
+    const options: RequestInit = {
+      method: 'DELETE',
+    };
+    
+    if (data) {
+      options.body = JSON.stringify(data);
+    }
+    
+    return this.request<T>(endpoint, options);
   }
 
   // 测试连接

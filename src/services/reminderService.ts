@@ -1,54 +1,5 @@
 import { db } from '../lib/database'
-
-export enum ReminderType {
-  TASK = 'task',
-  PROJECT = 'project',
-  MEETING = 'meeting',
-  DEADLINE = 'deadline',
-  MILESTONE = 'milestone',
-  REVIEW = 'review',
-  CUSTOM = 'custom'
-}
-
-export enum ReminderStatus {
-  PENDING = 'pending',
-  SENT = 'sent',
-  CANCELLED = 'cancelled'
-}
-
-export interface PaginationParams {
-  page: number;
-  limit: number;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-  search?: string;
-}
-
-export interface PaginatedResponse<T> {
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
-
-export interface Reminder {
-  id: number;
-  project_id?: number;
-  task_id?: number;
-  type: ReminderType;
-  title: string;
-  description?: string;
-  remind_at: string;
-  status: ReminderStatus;
-  recipients: string[];
-  created_by: number;
-  sent_at?: string;
-  created_at: string;
-  updated_at: string;
-}
+import { Reminder, ReminderType, ReminderStatus, PaginationParams, PaginatedResponse } from '../types'
 
 export class ReminderService {
   // 获取提醒列表
@@ -139,7 +90,7 @@ export class ReminderService {
         [
           reminder.project_id, reminder.task_id, reminder.type, reminder.title,
           reminder.description, reminder.remind_at, reminder.status,
-          JSON.stringify(reminder.recipients), reminder.created_by, now, now
+          now, now
         ]
       )
       const insertId = (result as any).insertId
@@ -227,7 +178,7 @@ export class ReminderService {
       let query = `SELECT * FROM reminders 
                    WHERE status = ? AND remind_at >= ? AND remind_at <= ? 
                    ORDER BY remind_at ASC`
-      let params = [ReminderStatus.PENDING, now, futureTime]
+      let params: (ReminderStatus | Date | number)[] = [ReminderStatus.PENDING, now, futureTime]
 
       if (projectId) {
         query = `SELECT * FROM reminders 
@@ -267,9 +218,7 @@ export class ReminderService {
       title: `截止日期提醒: ${title}`,
       description: `任务 "${title}" 将在 ${new Date(dueDate).toLocaleString()} 到期`,
       remind_at: remindAt.toISOString(),
-      status: ReminderStatus.PENDING,
-      recipients,
-      created_by: createdBy
+      status: ReminderStatus.PENDING
     })
   }
 
@@ -288,8 +237,6 @@ export class ReminderService {
       description: `项目里程碑 "${title}" 计划在 ${new Date(milestoneDate).toLocaleString()} 达成`,
       remind_at: milestoneDate,
       status: ReminderStatus.PENDING,
-      recipients,
-      created_by: createdBy
     })
   }
 
@@ -310,9 +257,7 @@ export class ReminderService {
       title: `会议提醒: ${title}`,
       description: `会议 "${title}" 将在 ${new Date(meetingTime).toLocaleString()} 开始`,
       remind_at: remindAt.toISOString(),
-      status: ReminderStatus.PENDING,
-      recipients,
-      created_by: createdBy
+      status: ReminderStatus.PENDING
     })
   }
 
@@ -332,9 +277,7 @@ export class ReminderService {
       title: `审查提醒: ${title}`,
       description: `任务 "${title}" 需要在 ${new Date(reviewDate).toLocaleString()} 进行审查`,
       remind_at: reviewDate,
-      status: ReminderStatus.PENDING,
-      recipients,
-      created_by: createdBy
+      status: ReminderStatus.PENDING
     })
   }
 

@@ -1,12 +1,7 @@
 import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
-import { User } from '../types'
 
 interface AppState {
-  // 用户相关
-  user: User | null
-  isAuthenticated: boolean
-  
   // 主题和外观
   theme: 'light' | 'dark' | 'system'
   colorScheme: string
@@ -47,11 +42,6 @@ interface AppState {
 }
 
 interface AppActions {
-  // 用户操作
-  setUser: (user: User | null) => void
-  login: (user: User) => void
-  logout: () => void
-  
   // 主题和外观
   setTheme: (theme: 'light' | 'dark' | 'system') => void
   setColorScheme: (scheme: string) => void
@@ -89,10 +79,6 @@ interface AppActions {
 type AppStore = AppState & AppActions
 
 const initialState: AppState = {
-  // 用户相关
-  user: null,
-  isAuthenticated: false,
-  
   // 主题和外观
   theme: 'light',
   colorScheme: 'blue',
@@ -137,26 +123,6 @@ export const useAppStore = create<AppStore>()(
     persist(
       (set, get) => ({
         ...initialState,
-        
-        // 用户操作
-        setUser: (user) => set({ user, isAuthenticated: !!user }),
-        
-        login: (user) => {
-          set({ user, isAuthenticated: true })
-          // 可以在这里添加登录后的初始化逻辑
-        },
-        
-        logout: () => {
-          set({ 
-            user: null, 
-            isAuthenticated: false,
-            currentPage: '',
-            breadcrumbs: []
-          })
-          // 清除其他相关状态
-          get().closeAllModals()
-          get().clearGlobalSearch()
-        },
         
         // 主题和外观
         setTheme: (theme) => {
@@ -277,12 +243,8 @@ export const useAppStore = create<AppStore>()(
             get().setColorScheme(colorScheme)
             get().setCompactMode(compactMode)
             
-            // 检查用户认证状态
-            const savedUser = localStorage.getItem('user')
-            if (savedUser) {
-              const user = JSON.parse(savedUser)
-              set({ user, isAuthenticated: true })
-            }
+            // 检查用户认证状态 - 单用户系统，无需检查
+            // 已移除用户认证相关逻辑
             
             // 监听系统主题变化
             if (theme === 'system') {
@@ -307,9 +269,7 @@ export const useAppStore = create<AppStore>()(
           colorScheme: state.colorScheme,
           compactMode: state.compactMode,
           sidebarCollapsed: state.sidebarCollapsed,
-          notifications: state.notifications,
-          user: state.user,
-          isAuthenticated: state.isAuthenticated
+          notifications: state.notifications
         })
       }
     ),
@@ -319,9 +279,7 @@ export const useAppStore = create<AppStore>()(
   )
 )
 
-// 导出选择器函数以优化性能
-export const useUser = () => useAppStore(state => state.user)
-export const useIsAuthenticated = () => useAppStore(state => state.isAuthenticated)
+// 导出常用的状态选择器
 export const useTheme = () => useAppStore(state => state.theme)
 export const useSidebarCollapsed = () => useAppStore(state => state.sidebarCollapsed)
 export const useModals = () => useAppStore(state => state.modals)

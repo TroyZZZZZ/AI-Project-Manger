@@ -69,22 +69,10 @@ const NotFound: React.FC = () => {
               项目概览
             </button>
             <button
-              onClick={() => navigate('/workload')}
+              onClick={() => navigate('/efficiency')}
               className="block w-full text-left px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900 rounded-md transition-colors"
             >
-              工作量统计
-            </button>
-            <button
-              onClick={() => navigate('/reminders')}
-              className="block w-full text-left px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900 rounded-md transition-colors"
-            >
-              提醒中心
-            </button>
-            <button
-              onClick={() => navigate('/settings')}
-              className="block w-full text-left px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900 rounded-md transition-colors"
-            >
-              系统设置
+              效能工时
             </button>
           </div>
         </div>

@@ -1,20 +1,14 @@
 import { apiClient } from '../lib/database'
+import { Task } from '../types'
 
-export interface Task {
-  id: number;
+export interface CreateTaskRequest {
   title: string;
   description?: string;
-  status: 'todo' | 'in_progress' | 'completed' | 'cancelled';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  project_id?: number;
-  assignee_id?: number;
+  project_id: number;
+  assigned_to?: number;
+  status?: string;
+  priority?: string;
   due_date?: string;
-  estimated_hours?: number;
-  actual_hours?: number;
-  tags?: string;
-  user_id: number;
-  created_at: string;
-  updated_at: string;
 }
 
 interface PaginationParams {
@@ -38,27 +32,50 @@ interface PaginatedResponse<T> {
 export class TaskService {
   // 获取任务列表
   static async getTasks(
-    projectId?: string,
-    pagination?: PaginationParams
+    params?: { 
+      project_id?: string | number; 
+      page?: number; 
+      limit?: number;
+      search?: string;
+      assignee_id?: number;
+      sort_by?: string;
+      sort_order?: 'asc' | 'desc';
+    }
   ): Promise<PaginatedResponse<Task>> {
     try {
       let url = '/tasks';
-      const params = new URLSearchParams();
+      const searchParams = new URLSearchParams();
       
-      if (projectId) {
-        params.append('projectId', projectId);
+      if (params?.project_id) {
+        searchParams.append('projectId', params.project_id.toString());
       }
       
-      if (pagination) {
-        params.append('page', pagination.page.toString());
-        params.append('limit', pagination.limit.toString());
-        if (pagination.sortBy) params.append('sortBy', pagination.sortBy);
-        if (pagination.sortOrder) params.append('sortOrder', pagination.sortOrder);
-        if (pagination.search) params.append('search', pagination.search);
+      if (params?.page) {
+        searchParams.append('page', params.page.toString());
       }
       
-      if (params.toString()) {
-        url += '?' + params.toString();
+      if (params?.limit) {
+        searchParams.append('limit', params.limit.toString());
+      }
+
+      if (params?.search) {
+        searchParams.append('search', params.search);
+      }
+
+      if (params?.assignee_id) {
+        searchParams.append('assigneeId', params.assignee_id.toString());
+      }
+
+      if (params?.sort_by) {
+        searchParams.append('sortBy', params.sort_by);
+      }
+
+      if (params?.sort_order) {
+        searchParams.append('sortOrder', params.sort_order);
+      }
+      
+      if (searchParams.toString()) {
+        url += '?' + searchParams.toString();
       }
       
       const response = await apiClient.get<PaginatedResponse<Task>>(url);
@@ -126,18 +143,6 @@ export class TaskService {
     }
   }
 
-  // 更新任务状态
-  static async updateTaskStatus(id: number, status: string): Promise<Task> {
-    const updates: Partial<Task> = { status: status as any };
-    
-    // 如果任务完成，记录完成时间
-    if (status === 'completed') {
-      updates.updated_at = new Date().toISOString();
-    }
-    
-    return this.updateTask(id, updates);
-  }
-
   // 更新任务工时
   static async updateTaskHours(id: number, actualHours: number): Promise<Task> {
     return this.updateTask(id, { actual_hours: actualHours });
@@ -148,7 +153,6 @@ export class TaskService {
     total: number;
     byStatus: Record<string, number>;
     byPriority: Record<string, number>;
-    totalEstimatedHours: number;
     totalActualHours: number;
     completionRate: number;
   }> {
@@ -157,7 +161,6 @@ export class TaskService {
         total: number;
         byStatus: Record<string, number>;
         byPriority: Record<string, number>;
-        totalEstimatedHours: number;
         totalActualHours: number;
         completionRate: number;
       }>(`/projects/${projectId}/tasks/stats`);
@@ -165,7 +168,6 @@ export class TaskService {
         total: 0,
         byStatus: {},
         byPriority: {},
-        totalEstimatedHours: 0,
         totalActualHours: 0,
         completionRate: 0
       };
@@ -175,18 +177,7 @@ export class TaskService {
     }
   }
 
-  // 获取用户分配的任务
-  static async getUserTasks(userId: number): Promise<Task[]> {
-    try {
-      const response = await apiClient.get<Task[]>(`/users/${userId}/tasks`);
-      return response.data || [];
-    } catch (error) {
-      console.error('Error fetching user tasks:', error);
-      throw error;
-    }
-  }
-
-  // 搜索任务
+  // 搜索任务（单用户系统）
   static async searchTasks(query: string, projectId?: number): Promise<Task[]> {
     try {
       let url = `/tasks/search?q=${encodeURIComponent(query)}`;
@@ -201,10 +192,10 @@ export class TaskService {
     }
   }
 
-  // 获取即将到期的任务
-  static async getUpcomingTasks(userId: number, days: number = 7): Promise<Task[]> {
+  // 获取即将到期的任务（单用户系统）
+  static async getUpcomingTasks(days: number = 7): Promise<Task[]> {
     try {
-      const response = await apiClient.get<Task[]>(`/users/${userId}/tasks/upcoming?days=${days}`);
+      const response = await apiClient.get<Task[]>(`/tasks/upcoming?days=${days}`);
       return response.data || [];
     } catch (error) {
       console.error('Error fetching upcoming tasks:', error);
@@ -212,13 +203,23 @@ export class TaskService {
     }
   }
 
-  // 获取逾期任务
-  static async getOverdueTasks(userId: number): Promise<Task[]> {
+  // 获取逾期任务（单用户系统）
+  static async getOverdueTasks(): Promise<Task[]> {
     try {
-      const response = await apiClient.get<Task[]>(`/users/${userId}/tasks/overdue`);
+      const response = await apiClient.get<Task[]>(`/tasks/overdue`);
       return response.data || [];
     } catch (error) {
       console.error('Error fetching overdue tasks:', error);
+      throw error;
+    }
+  }
+
+  // 批量删除任务
+  static async batchDelete(taskIds: number[]): Promise<void> {
+    try {
+      await apiClient.delete('/tasks/batch', { task_ids: taskIds });
+    } catch (error) {
+      console.error('Error batch deleting tasks:', error);
       throw error;
     }
   }

@@ -9,27 +9,39 @@ import {
   Filter,
   Plus
 } from 'lucide-react'
-import { useReminderStore } from '../stores/useReminderStore'
+import { Reminder, ReminderType, ReminderStatus } from '../types'
+import { ReminderService } from '../services/reminderService'
 import { useProjectStore } from '../stores/useProjectStore'
 import { useResponsive } from '../hooks/useResponsive'
-import { ResponsiveGrid } from '../components/ui/ResponsiveGrid'
 import { cn } from '../utils/cn'
 
 const ReminderCenter: React.FC = () => {
-  const { reminders, addReminder, updateReminder, deleteReminder } = useReminderStore()
   const { projects } = useProjectStore()
   const { isMobile, isTablet } = useResponsive()
-  const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all')
+  const [reminders, setReminders] = useState<Reminder[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState<'all' | 'pending' | 'sent' | 'cancelled'>('all')
   const [showAddForm, setShowAddForm] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [localProjects, setLocalProjects] = useState<any[]>([]) // 添加本地项目状态
+  const [newReminder, setNewReminder] = useState<Partial<Reminder>>({
+    title: '',
+    description: '',
+    type: ReminderType.DEADLINE,
+    remind_at: '',
+    project_id: undefined,
+    task_id: undefined
+  })
 
   useEffect(() => {
     loadReminders()
+    loadProjects()
   }, [])
 
   const loadReminders = async () => {
     try {
       setLoading(true)
-      const data = await ReminderService.getReminders({ page: 1, limit: 100 })
+      const data = await ReminderService.getReminders(undefined, { page: 1, limit: 100 })
       setReminders(data.data)
     } catch (error) {
       console.error('Error loading reminders:', error)
@@ -38,21 +50,40 @@ const ReminderCenter: React.FC = () => {
     }
   }
 
+  // 加载项目数据
+  const loadProjects = async () => {
+    try {
+      // 这里应该调用项目服务来获取项目列表
+      // const projects = await ProjectService.getProjects()
+      // setLocalProjects(projects)
+      setLocalProjects([]) // 临时设置为空数组
+    } catch (error) {
+      console.error('Failed to load projects:', error)
+    }
+  }
+
   const handleCreateReminder = async () => {
     try {
       await ReminderService.createReminder({
-        ...newReminder,
-        remind_at: new Date(newReminder.remind_at).toISOString()
+        title: newReminder.title || '',
+        description: newReminder.description,
+        type: newReminder.type || ReminderType.DEADLINE,
+        remind_at: new Date(newReminder.remind_at || '').toISOString(),
+        project_id: newReminder.project_id,
+        task_id: newReminder.task_id,
+
+        status: ReminderStatus.PENDING
       })
       
       setShowCreateModal(false)
       setNewReminder({
         title: '',
         description: '',
-        type: 'task_deadline',
+        type: ReminderType.DEADLINE,
         remind_at: '',
-        project_id: '',
-        task_id: ''
+        project_id: undefined,
+        task_id: undefined,
+
       })
       
       await loadReminders()
@@ -61,7 +92,7 @@ const ReminderCenter: React.FC = () => {
     }
   }
 
-  const handleUpdateReminder = async (id: string, updates: Partial<Reminder>) => {
+  const handleUpdateReminder = async (id: number, updates: Partial<Reminder>) => {
     try {
       await ReminderService.updateReminder(id, updates)
       await loadReminders()
@@ -70,7 +101,7 @@ const ReminderCenter: React.FC = () => {
     }
   }
 
-  const handleDeleteReminder = async (id: string) => {
+  const handleDeleteReminder = async (id: number) => {
     if (window.confirm('确定要删除这个提醒吗？')) {
       try {
         await ReminderService.deleteReminder(id)
@@ -81,36 +112,37 @@ const ReminderCenter: React.FC = () => {
     }
   }
 
-  const markAsRead = async (id: string) => {
-    await handleUpdateReminder(id, { is_read: true })
+  const handleCompleteReminder = async (id: number) => {
+    await handleUpdateReminder(id, { status: ReminderStatus.SENT })
   }
 
-  const getTypeIcon = (type: string) => {
+  const getTypeIcon = (type: ReminderType) => {
     switch (type) {
-      case 'task_deadline': return <Clock className="w-5 h-5 text-red-500" />
-      case 'milestone': return <CheckCircle className="w-5 h-5 text-green-500" />
-      case 'meeting': return <Calendar className="w-5 h-5 text-blue-500" />
-      case 'review': return <AlertTriangle className="w-5 h-5 text-yellow-500" />
+      case ReminderType.DEADLINE: return <Clock className="w-5 h-5 text-red-500" />
+      case ReminderType.MILESTONE: return <CheckCircle className="w-5 h-5 text-green-500" />
+      case ReminderType.MEETING: return <Calendar className="w-5 h-5 text-blue-500" />
+      case ReminderType.REVIEW: return <AlertTriangle className="w-5 h-5 text-yellow-500" />
       default: return <Bell className="w-5 h-5 text-gray-500" />
     }
   }
 
-  const getTypeText = (type: string) => {
+  const getTypeText = (type: ReminderType) => {
     switch (type) {
-      case 'task_deadline': return '任务截止'
-      case 'milestone': return '里程碑'
-      case 'meeting': return '会议'
-      case 'review': return '评审'
+      case ReminderType.DEADLINE: return '截止日期'
+      case ReminderType.MILESTONE: return '里程碑'
+      case ReminderType.MEETING: return '会议'
+      case ReminderType.REVIEW: return '评审'
+      case ReminderType.CUSTOM: return '自定义'
       default: return '其他'
     }
   }
 
-  const getTypeColor = (type: string) => {
+  const getTypeColor = (type: ReminderType) => {
     switch (type) {
-      case 'task_deadline': return 'bg-red-100 text-red-800'
-      case 'milestone': return 'bg-green-100 text-green-800'
-      case 'meeting': return 'bg-blue-100 text-blue-800'
-      case 'review': return 'bg-yellow-100 text-yellow-800'
+      case ReminderType.DEADLINE: return 'bg-red-100 text-red-800'
+      case ReminderType.MILESTONE: return 'bg-green-100 text-green-800'
+      case ReminderType.MEETING: return 'bg-blue-100 text-blue-800'
+      case ReminderType.REVIEW: return 'bg-yellow-100 text-yellow-800'
       default: return 'bg-gray-100 text-gray-800'
     }
   }
@@ -121,19 +153,17 @@ const ReminderCenter: React.FC = () => {
 
   const filteredReminders = reminders.filter(reminder => {
     switch (filter) {
-      case 'unread': return !reminder.is_read
-      case 'overdue': return isOverdue(reminder.remind_at) && !reminder.is_read
-      case 'today': {
-        const today = new Date()
-        const remindDate = new Date(reminder.remind_at)
-        return remindDate.toDateString() === today.toDateString()
-      }
+      case 'pending': return reminder.status === ReminderStatus.PENDING
+      case 'sent': return reminder.status === ReminderStatus.SENT
+      case 'cancelled': return reminder.status === ReminderStatus.CANCELLED
       default: return true
     }
   })
 
-  const unreadCount = reminders.filter(r => !r.is_read).length
-  const overdueCount = reminders.filter(r => isOverdue(r.remind_at) && !r.is_read).length
+  const pendingReminders = reminders.filter(r => r.status === ReminderStatus.PENDING)
+  const sentReminders = reminders.filter(r => r.status === ReminderStatus.SENT)
+  const cancelledReminders = reminders.filter(r => r.status === ReminderStatus.CANCELLED)
+  const overdueCount = reminders.filter(r => isOverdue(r.remind_at) && r.status === ReminderStatus.PENDING).length
 
   if (loading) {
     return (
@@ -178,7 +208,7 @@ const ReminderCenter: React.FC = () => {
             </p>
           </div>
           <button
-            onClick={() => setShowAddForm(true)}
+            onClick={() => setShowCreateModal(true)}
             className={cn(
               'inline-flex items-center px-4 py-2 border border-transparent font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500',
               isMobile ? 'w-full justify-center text-sm' : 'text-sm'
@@ -194,8 +224,8 @@ const ReminderCenter: React.FC = () => {
           <div className="bg-white p-6 rounded-lg shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">未读提醒</p>
-                <p className="text-2xl font-bold text-blue-600">{unreadCount}</p>
+                <p className="text-sm font-medium text-gray-600">待处理提醒</p>
+                <p className="text-2xl font-bold text-blue-600">{pendingReminders.length}</p>
               </div>
               <Bell className="w-8 h-8 text-blue-600" />
             </div>
@@ -223,7 +253,7 @@ const ReminderCenter: React.FC = () => {
         </div>
 
         {/* 筛选器 */}
-        <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
+        <div className="bg-white dark:bg-gray-800 shadow rounded-lg mb-6">
           <div className={cn(
             isMobile ? 'p-3' : 'p-4'
           )}>
@@ -271,16 +301,16 @@ const ReminderCenter: React.FC = () => {
                   待处理 ({pendingReminders.length})
                 </button>
                 <button
-                  onClick={() => setFilter('completed')}
+                  onClick={() => setFilter('sent')}
                   className={cn(
                     'px-3 py-1 rounded-full font-medium',
                     isMobile ? 'text-xs flex-1' : 'text-sm',
-                    filter === 'completed'
+                    filter === 'sent'
                       ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
                   )}
                 >
-                  已完成 ({completedReminders.length})
+                  已发送 ({sentReminders.length})
                 </button>
               </div>
             </div>
@@ -311,13 +341,13 @@ const ReminderCenter: React.FC = () => {
                 'mt-1 text-gray-500 dark:text-gray-400',
                 isMobile ? 'text-xs' : 'text-sm'
               )}>
-                {filter === 'all' ? '还没有创建任何提醒' : `没有${filter === 'pending' ? '待处理' : '已完成'}的提醒`}
+                {filter === 'all' ? '还没有创建任何提醒' : `没有${filter === 'pending' ? '待处理' : filter === 'sent' ? '已发送' : '已取消'}的提醒`}
               </p>
             </div>
           ) : (
             filteredReminders.map((reminder) => {
-              const project = projects.find(p => p.id === reminder.projectId)
-              const isOverdue = new Date(reminder.dueDate) < new Date() && !reminder.completed
+              const project = localProjects.find(p => p.id === reminder.project_id)
+              const isOverdueReminder = isOverdue(reminder.remind_at) && reminder.status === ReminderStatus.PENDING
               
               return (
                 <div
@@ -325,13 +355,9 @@ const ReminderCenter: React.FC = () => {
                   className={cn(
                     'bg-white dark:bg-gray-800 shadow rounded-lg border-l-4',
                     isMobile ? 'p-4' : 'p-6',
-                    isOverdue
+                    isOverdueReminder
                       ? 'border-red-400'
-                      : reminder.priority === 'high'
-                      ? 'border-orange-400'
-                      : reminder.priority === 'medium'
-                      ? 'border-yellow-400'
-                      : 'border-green-400'
+                      : 'border-blue-400'
                   )}
                 >
                   <div className={cn(
@@ -343,19 +369,20 @@ const ReminderCenter: React.FC = () => {
                       isMobile && 'w-full'
                     )}>
                       <div className="flex items-center space-x-2">
+                        {getTypeIcon(reminder.type)}
                         <h3 className={cn(
                           'font-medium text-gray-900 dark:text-white',
                           isMobile ? 'text-base' : 'text-lg'
                         )}>
                           {reminder.title}
                         </h3>
-                        {isOverdue && (
+                        {isOverdueReminder && (
                           <AlertTriangle className={cn(
                             'text-red-500',
                             isMobile ? 'h-4 w-4' : 'h-5 w-5'
                           )} />
                         )}
-                        {reminder.completed && (
+                        {reminder.status === ReminderStatus.SENT && (
                           <CheckCircle className={cn(
                             'text-green-500',
                             isMobile ? 'h-4 w-4' : 'h-5 w-5'
@@ -378,12 +405,21 @@ const ReminderCenter: React.FC = () => {
                       )}>
                         <div className="flex items-center space-x-1">
                           <Calendar className="h-4 w-4" />
-                          <span>{new Date(reminder.dueDate).toLocaleDateString()}</span>
+                          <span>{new Date(reminder.remind_at).toLocaleDateString()}</span>
                         </div>
                         
                         <div className="flex items-center space-x-1">
                           <Clock className="h-4 w-4" />
-                          <span>{reminder.time}</span>
+                          <span>{new Date(reminder.remind_at).toLocaleTimeString()}</span>
+                        </div>
+                        
+                        <div className="flex items-center space-x-1">
+                          <span className={cn(
+                            'px-2 py-1 rounded-full text-xs font-medium',
+                            getTypeColor(reminder.type)
+                          )}>
+                            {getTypeText(reminder.type)}
+                          </span>
                         </div>
                         
                         {project && (
@@ -394,19 +430,6 @@ const ReminderCenter: React.FC = () => {
                             )}>{project.name}</span>
                           </div>
                         )}
-                        
-                        <span className={cn(
-                          'px-2 py-1 rounded-full font-medium',
-                          isMobile ? 'text-xs' : 'text-xs',
-                          reminder.priority === 'high'
-                            ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                            : reminder.priority === 'medium'
-                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                            : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                        )}>
-                          {reminder.priority === 'high' ? '高优先级' :
-                           reminder.priority === 'medium' ? '中优先级' : '低优先级'}
-                        </span>
                       </div>
                     </div>
                     
@@ -414,14 +437,14 @@ const ReminderCenter: React.FC = () => {
                       'flex items-center space-x-2',
                       isMobile ? 'w-full justify-end' : 'ml-4'
                     )}>
-                      {!reminder.completed && (
+                      {reminder.status === ReminderStatus.PENDING && (
                         <button
                           onClick={() => handleCompleteReminder(reminder.id)}
                           className={cn(
                             'text-green-600 hover:bg-green-50 dark:hover:bg-green-900 rounded-full',
                             isMobile ? 'p-1.5' : 'p-2'
                           )}
-                          title="标记为完成"
+                          title="标记为已发送"
                         >
                           <CheckCircle className={cn(
                             isMobile ? 'h-4 w-4' : 'h-5 w-5'

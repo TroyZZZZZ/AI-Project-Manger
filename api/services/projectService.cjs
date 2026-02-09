@@ -1,22 +1,23 @@
 const { db } = require('../lib/database.cjs');
+const { dbValidator } = require('../utils/dbValidator.cjs');
+
+const hasTaskColumn = (columnName) => {
+  const columns = dbValidator.getTableColumns('tasks');
+  return columns.includes(columnName);
+};
 
 class ProjectService {
   // 获取项目列表
-  static async getProjects({ userId, page = 1, limit = 10, search, status, priority }) {
+  static async getProjects({ userId, page = 1, limit = 10, search, priority }) {
     try {
       const offset = (page - 1) * limit;
       let whereConditions = [];
       let params = [];
       
-      // 基础查询：用户参与的项目
-      whereConditions.push(`(
-        p.created_by = ? OR 
-        EXISTS (
-          SELECT 1 FROM project_members pm 
-          WHERE pm.project_id = p.id AND pm.user_id = ?
-        )
-      )`);
-      params.push(userId, userId);
+      // 基础查询：用户拥有的项目，但排除子项目（只显示顶级项目）
+      whereConditions.push('p.owner_id = ?');
+      whereConditions.push('p.parent_id IS NULL');
+      params.push(parseInt(userId));
       
       // 搜索条件
       if (search) {
@@ -25,17 +26,8 @@ class ProjectService {
         params.push(searchTerm, searchTerm);
       }
       
-      // 状态筛选
-      if (status) {
-        whereConditions.push('p.status = ?');
-        params.push(status);
-      }
-      
       // 优先级筛选
-      if (priority) {
-        whereConditions.push('p.priority = ?');
-        params.push(priority);
-      }
+
       
       const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
       
@@ -46,43 +38,51 @@ class ProjectService {
         ${whereClause}
       `;
       
-      const [countResult] = await db.query(countQuery, params);
+      const [countResult] = await db.execute(countQuery, params);
       const total = countResult[0].total;
       
-      // 获取项目列表
+      // 获取项目列表 - 使用字符串拼接避免LIMIT/OFFSET参数化问题
       const projectsQuery = `
         SELECT 
           p.*,
           u.username as creator_name,
-          u.email as creator_email,
-          (
-            SELECT COUNT(*) FROM tasks t 
-            WHERE t.project_id = p.id
-          ) as task_count,
-          (
-            SELECT COUNT(*) FROM tasks t 
-            WHERE t.project_id = p.id AND t.status = 'completed'
-          ) as completed_task_count,
-          (
-            SELECT COUNT(*) FROM project_members pm 
-            WHERE pm.project_id = p.id
-          ) + 1 as member_count,
-          CASE 
-            WHEN p.created_by = ? THEN 'owner'
-            ELSE COALESCE(
-              (SELECT role FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = ?),
-              'member'
-            )
-          END as user_role
+          u.email as creator_email
         FROM projects p
-        LEFT JOIN users u ON p.created_by = u.id
+        LEFT JOIN users u ON p.owner_id = u.id
         ${whereClause}
         ORDER BY p.updated_at DESC
-        LIMIT ? OFFSET ?
+        LIMIT ${limit} OFFSET ${offset}
       `;
       
-      const projectParams = [...params, userId, userId, limit, offset];
-      const [projects] = await db.query(projectsQuery, projectParams);
+      // 只传递WHERE子句的参数
+
+      const [projects] = await db.query(projectsQuery, params);
+      
+      const hasCompletedAt = hasTaskColumn('completed_at');
+
+      // 为每个项目添加统计信息
+      for (let project of projects) {
+        // 获取任务统计
+        const completedExpr = hasCompletedAt
+          ? 'SUM(CASE WHEN completed_at IS NOT NULL THEN 1 ELSE 0 END)'
+          : '0';
+        const [taskStats] = await db.execute(
+          `SELECT COUNT(*) as total, ${completedExpr} as completed FROM tasks WHERE project_id = ?`,
+          [project.id]
+        );
+        
+        project.task_count = taskStats[0].total;
+        project.completed_task_count = taskStats[0].completed;
+        
+        // 获取成员数量
+        const [memberCount] = await db.execute(
+          'SELECT COUNT(*) as count FROM project_members WHERE project_id = ?',
+          [project.id]
+        );
+        
+        project.member_count = memberCount[0].count + 1; // +1 for owner
+        project.user_role = 'owner';
+      }
       
       return {
         projects,
@@ -90,7 +90,22 @@ class ProjectService {
       };
     } catch (error) {
       console.error('获取项目列表失败:', error);
-      throw error;
+      
+      // 记录详细错误信息
+      const fs = require('fs');
+      const path = require('path');
+      const logDir = path.join(__dirname, '..', 'logs');
+      if (!fs.existsSync(logDir)) {
+        fs.mkdirSync(logDir, { recursive: true });
+      }
+      
+      const logFile = path.join(logDir, 'project-service-errors.log');
+      const timestamp = new Date().toISOString();
+      const logEntry = `[${timestamp}] 获取项目列表失败: ${error.message}\n参数: ${JSON.stringify({ userId, page, limit, search, priority })}\n堆栈: ${error.stack}\n\n`;
+      
+      fs.appendFileSync(logFile, logEntry);
+      
+      throw new Error('获取项目列表失败，请稍后重试');
     }
   }
   
@@ -100,39 +115,69 @@ class ProjectService {
       const {
         name,
         description,
-        status = 'active',
-        priority = 'medium',
-        start_date,
-        end_date,
         created_by
       } = projectData;
       
+      // 验证必需字段
+      if (!name || !name.trim()) {
+        throw new Error('项目名称不能为空');
+      }
+      
+      if (!created_by) {
+        throw new Error('创建者ID不能为空');
+      }
+      
       // 检查项目名称是否已存在（同一用户）
       const [existing] = await db.query(
-        'SELECT id FROM projects WHERE name = ? AND created_by = ?',
-        [name, created_by]
+        'SELECT id FROM projects WHERE name = ? AND owner_id = ?',
+        [name.trim(), created_by]
       );
       
       if (existing.length > 0) {
         throw new Error('项目名称已存在');
       }
       
-      // 验证日期
-      if (start_date && end_date && new Date(start_date) > new Date(end_date)) {
-        throw new Error('开始日期不能晚于结束日期');
-      }
-      
+      // 插入新项目
       const [result] = await db.query(
-        `INSERT INTO projects (name, description, status, priority, start_date, end_date, created_by, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-        [name, description, status, priority, start_date, end_date, created_by]
+        `INSERT INTO projects (name, description, owner_id, created_at, updated_at)
+         VALUES (?, ?, ?, NOW(), NOW())`,
+        [name.trim(), description || '', created_by]
       );
+      
+      if (!result.insertId) {
+        throw new Error('项目创建失败，未获取到项目ID');
+      }
       
       // 获取创建的项目详情
       const project = await this.getProjectById(result.insertId);
+      
+      if (!project) {
+        throw new Error('项目创建成功但获取详情失败');
+      }
+      
       return project;
     } catch (error) {
       console.error('创建项目失败:', error);
+      
+      // 记录详细错误信息
+      const fs = require('fs');
+      const path = require('path');
+      const logDir = path.join(__dirname, '..', 'logs');
+      if (!fs.existsSync(logDir)) {
+        fs.mkdirSync(logDir, { recursive: true });
+      }
+      
+      const logFile = path.join(logDir, 'project-service-errors.log');
+      const timestamp = new Date().toISOString();
+      const logEntry = `[${timestamp}] ProjectService.createProject 失败 - 项目数据: ${JSON.stringify(projectData)}, 错误: ${error.message}\n堆栈: ${error.stack}\n\n`;
+      
+      try {
+        fs.appendFileSync(logFile, logEntry);
+      } catch (logError) {
+        console.error('写入服务错误日志失败:', logError);
+      }
+      
+      // 重新抛出错误，保持原有的错误处理逻辑
       throw error;
     }
   }
@@ -140,6 +185,11 @@ class ProjectService {
   // 根据ID获取项目详情
   static async getProjectById(projectId) {
     try {
+      const hasCompletedAt = hasTaskColumn('completed_at');
+      const completedTaskCountSql = hasCompletedAt
+        ? `(SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.completed_at IS NOT NULL) as completed_task_count`
+        : `0 as completed_task_count`;
+
       const [projects] = await db.query(
         `SELECT 
           p.*,
@@ -149,16 +199,13 @@ class ProjectService {
             SELECT COUNT(*) FROM tasks t 
             WHERE t.project_id = p.id
           ) as task_count,
-          (
-            SELECT COUNT(*) FROM tasks t 
-            WHERE t.project_id = p.id AND t.status = 'completed'
-          ) as completed_task_count,
+          ${completedTaskCountSql},
           (
             SELECT COUNT(*) FROM project_members pm 
             WHERE pm.project_id = p.id
           ) + 1 as member_count
         FROM projects p
-        LEFT JOIN users u ON p.created_by = u.id
+        LEFT JOIN users u ON p.owner_id = u.id
         WHERE p.id = ?`,
         [projectId]
       );
@@ -182,30 +229,19 @@ class ProjectService {
       const {
         name,
         description,
-        status,
-        priority,
-        start_date,
-        end_date
+        priority
       } = updateData;
       
       // 如果更新名称，检查是否与其他项目重复
       if (name && name !== existingProject.name) {
         const [existing] = await db.query(
-          'SELECT id FROM projects WHERE name = ? AND created_by = ? AND id != ?',
-          [name, existingProject.created_by, projectId]
+          'SELECT id FROM projects WHERE name = ? AND owner_id = ? AND id != ?',
+          [name, existingProject.owner_id, projectId]
         );
         
         if (existing.length > 0) {
           throw new Error('项目名称已存在');
         }
-      }
-      
-      // 验证日期
-      const newStartDate = start_date || existingProject.start_date;
-      const newEndDate = end_date || existingProject.end_date;
-      
-      if (newStartDate && newEndDate && new Date(newStartDate) > new Date(newEndDate)) {
-        throw new Error('开始日期不能晚于结束日期');
       }
       
       // 构建更新字段
@@ -222,25 +258,12 @@ class ProjectService {
         updateValues.push(description);
       }
       
-      if (status !== undefined) {
-        updateFields.push('status = ?');
-        updateValues.push(status);
-      }
-      
       if (priority !== undefined) {
         updateFields.push('priority = ?');
         updateValues.push(priority);
       }
       
-      if (start_date !== undefined) {
-        updateFields.push('start_date = ?');
-        updateValues.push(start_date);
-      }
-      
-      if (end_date !== undefined) {
-        updateFields.push('end_date = ?');
-        updateValues.push(end_date);
-      }
+
       
       if (updateFields.length === 0) {
         return existingProject;
@@ -271,15 +294,7 @@ class ProjectService {
         throw new Error('项目不存在');
       }
       
-      // 检查是否有关联的任务
-      const [tasks] = await db.query(
-        'SELECT COUNT(*) as count FROM tasks WHERE project_id = ?',
-        [projectId]
-      );
-      
-      if (tasks[0].count > 0) {
-        throw new Error('项目存在关联任务，无法删除');
-      }
+      // 依赖数据库外键约束的ON DELETE CASCADE，允许直接删除项目
       
       // 开始事务
       await db.beginTransaction();
@@ -329,7 +344,7 @@ class ProjectService {
           p.created_at as joined_at,
           'owner' as member_type
         FROM projects p
-        JOIN users u ON p.created_by = u.id
+        JOIN users u ON p.owner_id = u.id
         WHERE p.id = ?
         
         ORDER BY 
@@ -361,7 +376,7 @@ class ProjectService {
       }
       
       // 检查用户是否已经是项目成员
-      if (project.created_by === userId) {
+      if (project.owner_id === userId) {
         throw new Error('用户已是项目创建者');
       }
       
@@ -441,7 +456,7 @@ class ProjectService {
       }
       
       // 检查是否是项目创建者
-      if (project.created_by === userId) {
+      if (project.owner_id === userId) {
         return requiredRoles.length === 0 || requiredRoles.includes('owner');
       }
       
@@ -472,38 +487,48 @@ class ProjectService {
       }
       
       // 检查是否是项目创建者
-      if (project.created_by === userId) {
+      if (project.owner_id === userId) {
         return true;
       }
       
-      // 检查是否是项目成员
-      const [members] = await db.query(
-        'SELECT id FROM project_members WHERE project_id = ? AND user_id = ?',
-        [projectId, userId]
-      );
-      
-      return members.length > 0;
+      return false;
     } catch (error) {
       console.error('检查项目成员失败:', error);
       return false;
     }
   }
-  
+
   // 获取项目统计信息
   static async getProjectStats(projectId) {
     try {
+      const hasCompletedAt = hasTaskColumn('completed_at');
+      const hasPriority = hasTaskColumn('priority');
+
+      const todoExpr = hasCompletedAt
+        ? 'COUNT(CASE WHEN t.completed_at IS NULL THEN 1 END)'
+        : 'COUNT(t.id)';
+      const completedExpr = hasCompletedAt
+        ? 'COUNT(CASE WHEN t.completed_at IS NOT NULL THEN 1 END)'
+        : '0';
+      const highPriorityExpr = hasPriority
+        ? "COUNT(CASE WHEN t.priority = 'high' THEN 1 END)"
+        : '0';
+      const mediumPriorityExpr = hasPriority
+        ? "COUNT(CASE WHEN t.priority = 'medium' THEN 1 END)"
+        : '0';
+      const lowPriorityExpr = hasPriority
+        ? "COUNT(CASE WHEN t.priority = 'low' THEN 1 END)"
+        : '0';
+
       const [stats] = await db.query(
         `SELECT 
           COUNT(t.id) as total_tasks,
-          COUNT(CASE WHEN t.status = 'todo' THEN 1 END) as todo_tasks,
-          COUNT(CASE WHEN t.status = 'in_progress' THEN 1 END) as in_progress_tasks,
-          COUNT(CASE WHEN t.status = 'completed' THEN 1 END) as completed_tasks,
-          COUNT(CASE WHEN t.priority = 'high' THEN 1 END) as high_priority_tasks,
-          COUNT(CASE WHEN t.priority = 'medium' THEN 1 END) as medium_priority_tasks,
-          COUNT(CASE WHEN t.priority = 'low' THEN 1 END) as low_priority_tasks,
-          COALESCE(SUM(t.estimated_hours), 0) as total_estimated_hours,
-          COALESCE(SUM(t.actual_hours), 0) as total_actual_hours,
-          COUNT(DISTINCT t.assigned_to) as active_members
+          ${todoExpr} as todo_tasks,
+          ${completedExpr} as completed_tasks,
+          ${highPriorityExpr} as high_priority_tasks,
+          ${mediumPriorityExpr} as medium_priority_tasks,
+          ${lowPriorityExpr} as low_priority_tasks,
+          COALESCE(SUM(t.actual_hours), 0) as total_actual_hours
         FROM tasks t
         WHERE t.project_id = ?`,
         [projectId]
@@ -516,11 +541,6 @@ class ProjectService {
         ? Math.round((projectStats.completed_tasks / projectStats.total_tasks) * 100)
         : 0;
       
-      // 计算工时效率
-      projectStats.time_efficiency = projectStats.total_estimated_hours > 0
-        ? Math.round((projectStats.total_estimated_hours / projectStats.total_actual_hours) * 100)
-        : 0;
-      
       return projectStats;
     } catch (error) {
       console.error('获取项目统计失败:', error);
@@ -528,47 +548,35 @@ class ProjectService {
     }
   }
   
-  // 获取用户参与的所有项目
-  static async getUserProjects(userId) {
+  // 获取所有项目（单用户系统）
+  static async getAllProjects() {
     try {
+      const hasCompletedAt = hasTaskColumn('completed_at');
+      const completedTaskCountSql = hasCompletedAt
+        ? `(SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.completed_at IS NOT NULL) as completed_task_count`
+        : `0 as completed_task_count`;
+
       const [projects] = await db.query(
         `SELECT 
           p.*,
-          u.username as creator_name,
-          CASE 
-            WHEN p.created_by = ? THEN 'owner'
-            ELSE COALESCE(
-              (SELECT role FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = ?),
-              'member'
-            )
-          END as user_role,
           (
             SELECT COUNT(*) FROM tasks t 
             WHERE t.project_id = p.id
           ) as task_count,
-          (
-            SELECT COUNT(*) FROM tasks t 
-            WHERE t.project_id = p.id AND t.status = 'completed'
-          ) as completed_task_count
+          ${completedTaskCountSql}
         FROM projects p
-        LEFT JOIN users u ON p.created_by = u.id
-        WHERE p.created_by = ? OR EXISTS (
-          SELECT 1 FROM project_members pm 
-          WHERE pm.project_id = p.id AND pm.user_id = ?
-        )
-        ORDER BY p.updated_at DESC`,
-        [userId, userId, userId, userId]
+        ORDER BY p.updated_at DESC`
       );
       
       return projects;
     } catch (error) {
-      console.error('获取用户项目失败:', error);
+      console.error('获取所有项目失败:', error);
       throw error;
     }
   }
   
-  // 搜索项目
-  static async searchProjects({ keyword, userId, page = 1, limit = 10 }) {
+  // 搜索项目（单用户系统）
+  static async searchProjects({ keyword, page = 1, limit = 10 }) {
     try {
       const offset = (page - 1) * limit;
       const searchTerm = `%${keyword}%`;
@@ -577,49 +585,28 @@ class ProjectService {
       const [countResult] = await db.query(
         `SELECT COUNT(DISTINCT p.id) as total
         FROM projects p
-        WHERE (p.name LIKE ? OR p.description LIKE ?)
-        AND (
-          p.created_by = ? OR 
-          EXISTS (
-            SELECT 1 FROM project_members pm 
-            WHERE pm.project_id = p.id AND pm.user_id = ?
-          )
-        )`,
-        [searchTerm, searchTerm, userId, userId]
+        WHERE (p.name LIKE ? OR p.description LIKE ?)`,
+        [searchTerm, searchTerm]
       );
       
       const total = countResult[0].total;
       
       // 获取项目列表
+      const hasCompletedAt = hasTaskColumn('completed_at');
+      const completedTaskCountSql = hasCompletedAt
+        ? `(SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.completed_at IS NOT NULL) as completed_task_count`
+        : `0 as completed_task_count`;
+
       const [projects] = await db.query(
         `SELECT 
           p.*,
-          u.username as creator_name,
-          CASE 
-            WHEN p.created_by = ? THEN 'owner'
-            ELSE COALESCE(
-              (SELECT role FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = ?),
-              'member'
-            )
-          END as user_role,
           (
             SELECT COUNT(*) FROM tasks t 
             WHERE t.project_id = p.id
           ) as task_count,
-          (
-            SELECT COUNT(*) FROM tasks t 
-            WHERE t.project_id = p.id AND t.status = 'completed'
-          ) as completed_task_count
+          ${completedTaskCountSql}
         FROM projects p
-        LEFT JOIN users u ON p.created_by = u.id
         WHERE (p.name LIKE ? OR p.description LIKE ?)
-        AND (
-          p.created_by = ? OR 
-          EXISTS (
-            SELECT 1 FROM project_members pm 
-            WHERE pm.project_id = p.id AND pm.user_id = ?
-          )
-        )
         ORDER BY 
           CASE 
             WHEN p.name LIKE ? THEN 1
@@ -628,7 +615,7 @@ class ProjectService {
           END,
           p.updated_at DESC
         LIMIT ? OFFSET ?`,
-        [userId, userId, searchTerm, searchTerm, userId, userId, searchTerm, searchTerm, limit, offset]
+        [searchTerm, searchTerm, searchTerm, searchTerm, limit, offset]
       );
       
       return {

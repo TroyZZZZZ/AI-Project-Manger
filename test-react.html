@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>React测试页面</title>
+    <script type="module">
+        console.log('测试页面: 开始加载React')
+        import React from '/node_modules/react/index.js'
+        import ReactDOM from '/node_modules/react-dom/client.js'
+        
+        console.log('测试页面: React和ReactDOM已导入')
+        
+        function TestApp() {
+            console.log('TestApp: 组件渲染中')
+            return React.createElement('div', {
+                style: { padding: '20px', fontSize: '18px', color: 'green' }
+            }, '✓ React应用渲染成功！这是一个测试页面。')
+        }
+        
+        console.log('测试页面: 查找root元素')
+        const root = document.getElementById('root')
+        if (root) {
+            console.log('测试页面: 找到root元素，创建React根')
+            const reactRoot = ReactDOM.createRoot(root)
+            console.log('测试页面: 渲染TestApp组件')
+            reactRoot.render(React.createElement(TestApp))
+        } else {
+            console.error('测试页面: 未找到root元素')
+        }
+    </script>
+</head>
+<body>
+    <div id="root"></div>
+</body>
+</html>

@@ -6,11 +6,12 @@ class FileService {
     try {
       const now = new Date();
       const [result] = await db.query(
-        `INSERT INTO files (filename, file_path, file_size, mime_type, uploader_id, 
+        `INSERT INTO files (filename, original_name, file_path, file_size, mime_type, uploader_id, 
          project_id, task_id, category, description, created_at, updated_at) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           fileData.filename,
+          fileData.filename, // 使用filename作为original_name
           fileData.file_path,
           fileData.file_size,
           fileData.mime_type,
@@ -285,6 +286,112 @@ class FileService {
       return {
         success: false,
         message: '获取用户文件失败'
+      };
+    }
+  }
+
+  // 获取文件列表（新增方法）
+  async getFileList(options = {}) {
+    try {
+      const {
+        userId,
+        userRole,
+        projectId,
+        taskId,
+        category,
+        page = 1,
+        limit = 20,
+        search,
+        sortBy = 'created_at',
+        sortOrder = 'DESC'
+      } = options;
+
+      console.log('getFileList 参数:', { userId, userRole, projectId, taskId, category, page, limit });
+
+      // 使用字符串拼接而不是参数化查询来避免MySQL参数问题
+      let query = 'SELECT * FROM files WHERE 1=1';
+
+      // 应用过滤条件
+      if (projectId) {
+        query += ` AND project_id = ${parseInt(projectId)}`;
+      }
+
+      if (taskId) {
+        query += ` AND task_id = ${parseInt(taskId)}`;
+      }
+
+      if (category) {
+        query += ` AND category = '${category.replace(/'/g, "''")}'`;
+      }
+
+      if (search) {
+        const escapedSearch = search.replace(/'/g, "''");
+        query += ` AND (filename LIKE '%${escapedSearch}%' OR description LIKE '%${escapedSearch}%')`;
+      }
+
+      // 权限控制：非管理员只能看到自己上传的文件或公开文件
+      if (userRole && userRole !== 'admin') {
+        query += ` AND (uploader_id = ${parseInt(userId)} OR is_public = 1)`;
+      }
+
+      // 排序
+      const allowedSortFields = ['filename', 'file_size', 'created_at', 'category'];
+      const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'created_at';
+      const order = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+      query += ` ORDER BY ${sortField} ${order}`;
+
+      // 分页
+      const offset = (parseInt(page) - 1) * parseInt(limit);
+      query += ` LIMIT ${parseInt(limit)} OFFSET ${offset}`;
+
+      console.log('执行查询:', query);
+
+      const [rows] = await db.query(query);
+
+      // 获取总数
+      let countQuery = 'SELECT COUNT(*) as total FROM files WHERE 1=1';
+
+      if (projectId) {
+        countQuery += ` AND project_id = ${parseInt(projectId)}`;
+      }
+
+      if (taskId) {
+        countQuery += ` AND task_id = ${parseInt(taskId)}`;
+      }
+
+      if (category) {
+        countQuery += ` AND category = '${category.replace(/'/g, "''")}'`;
+      }
+
+      if (search) {
+        const escapedSearch = search.replace(/'/g, "''");
+        countQuery += ` AND (filename LIKE '%${escapedSearch}%' OR description LIKE '%${escapedSearch}%')`;
+      }
+
+      if (userRole && userRole !== 'admin') {
+        countQuery += ` AND (uploader_id = ${parseInt(userId)} OR is_public = 1)`;
+      }
+
+      const [countRows] = await db.query(countQuery);
+      const total = countRows[0].total;
+
+      return {
+        success: true,
+        data: {
+          files: rows,
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total,
+            totalPages: Math.ceil(total / parseInt(limit))
+          }
+        }
+      };
+    } catch (error) {
+      console.error('获取文件列表错误:', error);
+      return {
+        success: false,
+        message: '获取文件列表失败'
       };
     }
   }

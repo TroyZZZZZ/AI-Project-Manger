@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
-import { Project, ProjectStatus, ProjectPriority } from '../types'
+import { Project } from '../types'
 import { ProjectService } from '../services/projectService'
 
 interface ProjectState {
@@ -9,8 +9,6 @@ interface ProjectState {
   loading: boolean
   error: string | null
   searchQuery: string
-  statusFilter: ProjectStatus | 'all'
-  priorityFilter: ProjectPriority | 'all'
   sortBy: 'name' | 'created_at' | 'updated_at' | 'deadline'
   sortOrder: 'asc' | 'desc'
   pagination: {
@@ -23,12 +21,12 @@ interface ProjectState {
 interface ProjectActions {
   // 数据获取
   fetchProjects: () => Promise<void>
-  fetchProjectById: (id: string) => Promise<void>
+  fetchProjectById: (id: number) => Promise<void>
   
   // 项目操作
   createProject: (project: Omit<Project, 'id' | 'created_at' | 'updated_at'>) => Promise<void>
-  updateProject: (id: string, updates: Partial<Project>) => Promise<void>
-  deleteProject: (id: string) => Promise<void>
+  updateProject: (id: number, updates: Partial<Project>) => Promise<void>
+  deleteProject: (id: number) => Promise<void>
   
   // 状态管理
   setCurrentProject: (project: Project | null) => void
@@ -37,8 +35,6 @@ interface ProjectActions {
   
   // 筛选和搜索
   setSearchQuery: (query: string) => void
-  setStatusFilter: (status: ProjectStatus | 'all') => void
-  setPriorityFilter: (priority: ProjectPriority | 'all') => void
   setSortBy: (sortBy: ProjectState['sortBy']) => void
   setSortOrder: (order: 'asc' | 'desc') => void
   
@@ -59,8 +55,6 @@ const initialState: ProjectState = {
   loading: false,
   error: null,
   searchQuery: '',
-  statusFilter: 'all',
-  priorityFilter: 'all',
   sortBy: 'updated_at',
   sortOrder: 'desc',
   pagination: {
@@ -70,7 +64,7 @@ const initialState: ProjectState = {
   }
 }
 
-export const useProjectStore = create<ProjectStore>()()
+export const useProjectStore = create<ProjectStore>()(
   devtools(
     persist(
       (set, get) => ({
@@ -83,9 +77,7 @@ export const useProjectStore = create<ProjectStore>()()
           
           try {
             const filters = {
-              search: state.searchQuery || undefined,
-              status: state.statusFilter !== 'all' ? state.statusFilter : undefined,
-              priority: state.priorityFilter !== 'all' ? state.priorityFilter : undefined
+              search: state.searchQuery || undefined
             }
             
             const result = await ProjectService.getProjects(
@@ -100,7 +92,7 @@ export const useProjectStore = create<ProjectStore>()()
               projects: result.data,
               pagination: {
                 ...state.pagination,
-                total: result.total
+                total: result.total || result.data.length
               },
               loading: false
             })
@@ -112,7 +104,7 @@ export const useProjectStore = create<ProjectStore>()()
           }
         },
         
-        fetchProjectById: async (id: string) => {
+        fetchProjectById: async (id: number) => {
           set({ loading: true, error: null })
           
           try {
@@ -148,7 +140,7 @@ export const useProjectStore = create<ProjectStore>()()
           }
         },
         
-        updateProject: async (id: string, updates: Partial<Project>) => {
+        updateProject: async (id: number, updates: Partial<Project>) => {
           set({ loading: true, error: null })
           
           try {
@@ -168,13 +160,12 @@ export const useProjectStore = create<ProjectStore>()()
           }
         },
         
-        deleteProject: async (id: string) => {
+        deleteProject: async (id: number) => {
           set({ loading: true, error: null })
           
           try {
             await ProjectService.deleteProject(id)
             const state = get()
-            
             set({
               projects: state.projects.filter(p => p.id !== id),
               currentProject: state.currentProject?.id === id ? null : state.currentProject,
@@ -198,16 +189,6 @@ export const useProjectStore = create<ProjectStore>()()
           set({ searchQuery: query, pagination: { ...get().pagination, page: 1 } })
           // 自动触发搜索
           setTimeout(() => get().fetchProjects(), 300)
-        },
-        
-        setStatusFilter: (status) => {
-          set({ statusFilter: status, pagination: { ...get().pagination, page: 1 } })
-          get().fetchProjects()
-        },
-        
-        setPriorityFilter: (priority) => {
-          set({ priorityFilter: priority, pagination: { ...get().pagination, page: 1 } })
-          get().fetchProjects()
         },
         
         setSortBy: (sortBy) => {
@@ -235,8 +216,6 @@ export const useProjectStore = create<ProjectStore>()()
         resetFilters: () => {
           set({
             searchQuery: '',
-            statusFilter: 'all',
-            priorityFilter: 'all',
             sortBy: 'updated_at',
             sortOrder: 'desc',
             pagination: { ...get().pagination, page: 1 }
@@ -250,8 +229,6 @@ export const useProjectStore = create<ProjectStore>()()
         name: 'project-store',
         partialize: (state) => ({
           searchQuery: state.searchQuery,
-          statusFilter: state.statusFilter,
-          priorityFilter: state.priorityFilter,
           sortBy: state.sortBy,
           sortOrder: state.sortOrder,
           pagination: state.pagination
@@ -262,3 +239,4 @@ export const useProjectStore = create<ProjectStore>()()
       name: 'project-store'
     }
   )
+)

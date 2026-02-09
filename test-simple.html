@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简单测试页面</title>
+</head>
+<body>
+    <div id="root">正在加载...</div>
+    
+    <script>
+        console.log('简单测试: 脚本开始执行')
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('简单测试: DOM加载完成')
+            
+            const root = document.getElementById('root')
+            if (root) {
+                console.log('简单测试: 找到root元素')
+                root.innerHTML = `
+                    <div style="padding: 20px; font-size: 18px; color: blue; border: 2px solid blue; margin: 20px;">
+                        ✅ 简单HTML页面JavaScript执行成功！
+                        <br><br>
+                        这是一个不依赖Vite的纯HTML测试页面。
+                        <br><br>
+                        时间: ${new Date().toLocaleString()}
+                    </div>
+                `
+                console.log('简单测试: 内容设置完成')
+            } else {
+                console.error('简单测试: 未找到root元素')
+            }
+        })
+        
+        console.log('简单测试: 脚本执行完成')
+    </script>
+</body>
+</html>

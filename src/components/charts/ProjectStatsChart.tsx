@@ -21,6 +21,8 @@ interface ProjectStatsData {
   pending: number
 }
 
+export type { ProjectStatsData }
+
 interface ProjectStatsChartProps {
   data: ProjectStatsData[]
   type?: 'bar' | 'pie'
@@ -82,13 +84,14 @@ const ProjectStatsChart: React.FC<ProjectStatsChartProps> = ({
   const CustomPieTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0]
+      const totalValue = pieData.reduce((sum, item) => sum + item.value, 0)
       return (
         <div className="bg-white dark:bg-gray-800 p-3 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
           <p className="text-sm font-medium" style={{ color: data.payload.color }}>
             {data.name}: {data.value}
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            占比: {((data.value / pieData.reduce((sum, item) => sum + item.value, 0)) * 100).toFixed(1)}%
+            占比: {((data.value / totalValue) * 100).toFixed(1)}%
           </p>
         </div>
       )
@@ -106,7 +109,7 @@ const ProjectStatsChart: React.FC<ProjectStatsChartProps> = ({
               cx="50%"
               cy="50%"
               labelLine={false}
-              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+              label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`}
               outerRadius={80}
               fill="#8884d8"
               dataKey="value"

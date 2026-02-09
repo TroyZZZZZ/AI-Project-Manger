@@ -1,7 +1,9 @@
 const express = require('express');
 const multer = require('multer');
-const { authenticate } = require('../middleware/auth.cjs');
-const { validateId } = require('../middleware/validation.cjs');
+const path = require('path');
+const fs = require('fs');
+const { v4: uuidv4 } = require('uuid');
+const { validateFileUpload } = require('../middleware/validation.cjs');
 const { OssService } = require('../services/oss.cjs');
 const { FileService } = require('../services/fileService.cjs');
 
@@ -56,9 +58,9 @@ const upload = multer({
  * @desc 单文件上传
  * @access Private
  */
-router.post('/single', authenticate, upload.single('file'), async (req, res) => {
+router.post('/single', upload.single('file'), async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = 1; // 单用户系统，固定用户ID为1
     const file = req.file;
     const { project_id, task_id, category = 'other', description } = req.body;
     
@@ -69,17 +71,6 @@ router.post('/single', authenticate, upload.single('file'), async (req, res) => 
       });
     }
     
-    // 检查项目访问权限（如果指定了项目ID）
-    if (project_id) {
-      const hasAccess = await FileService.checkProjectAccess(userId, parseInt(project_id));
-      if (!hasAccess) {
-        return res.status(403).json({
-          success: false,
-          message: '没有权限访问该项目'
-        });
-      }
-    }
-    
     // 上传文件到OSS
     const uploadResult = await OssService.uploadFile(file, {
       userId,
@@ -87,56 +78,38 @@ router.post('/single', authenticate, upload.single('file'), async (req, res) => 
       category
     });
     
-    if (!uploadResult.success) {
-      return res.status(500).json({
-        success: false,
-        message: uploadResult.message || '文件上传失败'
-      });
-    }
-    
-    // 保存文件信息到数据库
-    const fileData = {
+    // 保存文件记录到数据库
+    const fileService = new FileService();
+    const fileRecord = await fileService.createFileRecord({
       filename: file.originalname,
       file_path: uploadResult.url,
       file_size: file.size,
       mime_type: file.mimetype,
-      uploader_id: userId,
+      uploaded_by: userId,
       project_id: project_id ? parseInt(project_id) : null,
       task_id: task_id ? parseInt(task_id) : null,
       category,
-      description: description || null
-    };
+      description
+    });
     
-    const saveResult = await FileService.saveFileInfo(fileData);
-    
-    if (saveResult.success) {
-      res.status(201).json({
-        success: true,
-        message: '文件上传成功',
-        data: {
-          id: saveResult.data.id,
-          filename: saveResult.data.filename,
-          url: uploadResult.url,
-          size: file.size,
-          type: file.mimetype,
-          category,
-          uploaded_at: saveResult.data.created_at
-        }
-      });
-    } else {
-      // 如果数据库保存失败，尝试删除已上传的文件
-      await OssService.deleteFile(uploadResult.key);
-      
-      res.status(500).json({
-        success: false,
-        message: '文件信息保存失败'
-      });
-    }
+    res.json({
+      success: true,
+      data: {
+        file_id: fileRecord.id,
+        filename: fileRecord.filename,
+        url: fileRecord.file_path,
+        size: fileRecord.file_size,
+        type: fileRecord.mime_type,
+        category: fileRecord.category,
+        uploaded_at: fileRecord.created_at
+      },
+      message: '文件上传成功'
+    });
   } catch (error) {
-    console.error('文件上传错误:', error);
+    console.error('文件上传失败:', error);
     res.status(500).json({
       success: false,
-      message: error.message || '服务器内部错误'
+      message: error.message || '文件上传失败'
     });
   }
 });
@@ -146,9 +119,9 @@ router.post('/single', authenticate, upload.single('file'), async (req, res) => 
  * @desc 多文件上传
  * @access Private
  */
-router.post('/multiple', authenticate, upload.array('files', 10), async (req, res) => {
+router.post('/multiple', upload.array('files', 10), async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = 1; // 单用户系统，固定用户ID为1
     const files = req.files;
     const { project_id, task_id, category = 'other', description } = req.body;
     
@@ -159,21 +132,9 @@ router.post('/multiple', authenticate, upload.array('files', 10), async (req, re
       });
     }
     
-    // 检查项目访问权限（如果指定了项目ID）
-    if (project_id) {
-      const hasAccess = await FileService.checkProjectAccess(userId, parseInt(project_id));
-      if (!hasAccess) {
-        return res.status(403).json({
-          success: false,
-          message: '没有权限访问该项目'
-        });
-      }
-    }
-    
     const uploadResults = [];
-    const failedUploads = [];
+    const fileService = new FileService();
     
-    // 批量上传文件
     for (const file of files) {
       try {
         // 上传文件到OSS
@@ -183,70 +144,47 @@ router.post('/multiple', authenticate, upload.array('files', 10), async (req, re
           category
         });
         
-        if (uploadResult.success) {
-          // 保存文件信息到数据库
-          const fileData = {
-            filename: file.originalname,
-            file_path: uploadResult.url,
-            file_size: file.size,
-            mime_type: file.mimetype,
-            uploader_id: userId,
-            project_id: project_id ? parseInt(project_id) : null,
-            task_id: task_id ? parseInt(task_id) : null,
-            category,
-            description: description || null
-          };
-          
-          const saveResult = await FileService.saveFileInfo(fileData);
-          
-          if (saveResult.success) {
-            uploadResults.push({
-              id: saveResult.data.id,
-              filename: saveResult.data.filename,
-              url: uploadResult.url,
-              size: file.size,
-              type: file.mimetype,
-              category,
-              uploaded_at: saveResult.data.created_at
-            });
-          } else {
-            // 如果数据库保存失败，删除已上传的文件
-            await OssService.deleteFile(uploadResult.key);
-            failedUploads.push({
-              filename: file.originalname,
-              error: '文件信息保存失败'
-            });
-          }
-        } else {
-          failedUploads.push({
-            filename: file.originalname,
-            error: uploadResult.message || '文件上传失败'
-          });
-        }
-      } catch (error) {
-        failedUploads.push({
+        // 保存文件记录到数据库
+        const fileRecord = await fileService.createFileRecord({
           filename: file.originalname,
-          error: error.message || '上传过程中发生错误'
+          file_path: uploadResult.url,
+          file_size: file.size,
+          mime_type: file.mimetype,
+          uploaded_by: userId,
+          project_id: project_id ? parseInt(project_id) : null,
+          task_id: task_id ? parseInt(task_id) : null,
+          category,
+          description
+        });
+        
+        uploadResults.push({
+          file_id: fileRecord.id,
+          filename: fileRecord.filename,
+          url: fileRecord.file_path,
+          size: fileRecord.file_size,
+          type: fileRecord.mime_type,
+          category: fileRecord.category,
+          uploaded_at: fileRecord.created_at
+        });
+      } catch (error) {
+        console.error(`文件 ${file.originalname} 上传失败:`, error);
+        uploadResults.push({
+          filename: file.originalname,
+          error: error.message || '上传失败'
         });
       }
     }
     
-    res.status(201).json({
+    res.json({
       success: true,
-      message: `成功上传 ${uploadResults.length} 个文件${failedUploads.length > 0 ? `，${failedUploads.length} 个文件上传失败` : ''}`,
-      data: {
-        uploaded: uploadResults,
-        failed: failedUploads,
-        total: files.length,
-        success_count: uploadResults.length,
-        failed_count: failedUploads.length
-      }
+      data: uploadResults,
+      message: `成功上传 ${uploadResults.filter(r => !r.error).length} 个文件`
     });
   } catch (error) {
-    console.error('批量文件上传错误:', error);
+    console.error('批量文件上传失败:', error);
     res.status(500).json({
       success: false,
-      message: '服务器内部错误'
+      message: error.message || '批量文件上传失败'
     });
   }
 });
@@ -256,15 +194,14 @@ router.post('/multiple', authenticate, upload.array('files', 10), async (req, re
  * @desc 获取文件列表
  * @access Private
  */
-router.get('/files', authenticate, async (req, res) => {
+router.get('/files', async (req, res) => {
   try {
-    const userId = req.user.id;
-    const userRole = req.user.role;
+    const userId = 1; // 单用户系统，固定用户ID为1
     const { project_id, task_id, category, page = 1, limit = 20 } = req.query;
     
-    const result = await FileService.getFileList({
+    const fileService = new FileService();
+    const files = await fileService.getFiles({
       userId,
-      userRole,
       projectId: project_id ? parseInt(project_id) : null,
       taskId: task_id ? parseInt(task_id) : null,
       category,
@@ -272,23 +209,118 @@ router.get('/files', authenticate, async (req, res) => {
       limit: parseInt(limit)
     });
     
-    if (result.success) {
-      res.json({
-        success: true,
-        data: result.data,
-        pagination: result.pagination
-      });
-    } else {
-      res.status(result.code || 400).json({
-        success: false,
-        message: result.message
-      });
-    }
+    res.json({
+      success: true,
+      data: files
+    });
   } catch (error) {
-    console.error('获取文件列表错误:', error);
+    console.error('获取文件列表失败:', error);
     res.status(500).json({
       success: false,
-      message: '服务器内部错误'
+      message: error.message || '获取文件列表失败'
+    });
+  }
+});
+
+/**
+ * @route DELETE /api/upload/files/:id
+ * @desc 删除文件
+ * @access Private
+ */
+router.delete('/files/:id', async (req, res) => {
+  try {
+    const userId = 1; // 单用户系统，固定用户ID为1
+    const fileId = parseInt(req.params.id);
+    
+    if (!fileId || isNaN(fileId)) {
+      return res.status(400).json({
+        success: false,
+        message: '无效的文件ID'
+      });
+    }
+    
+    const fileService = new FileService();
+    
+    // 获取文件信息
+    const file = await fileService.getFileById(fileId);
+    if (!file) {
+      return res.status(404).json({
+        success: false,
+        message: '文件不存在'
+      });
+    }
+    
+    // 删除OSS文件
+    try {
+      await OssService.deleteFile(file.file_path);
+    } catch (error) {
+      console.error('删除OSS文件失败:', error);
+      // 继续删除数据库记录，即使OSS删除失败
+    }
+    
+    // 删除数据库记录
+    await fileService.deleteFile(fileId, userId);
+    
+    res.json({
+      success: true,
+      message: '文件删除成功'
+    });
+  } catch (error) {
+    console.error('删除文件失败:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || '删除文件失败'
+    });
+  }
+});
+
+/**
+ * @route GET /api/upload/files/:id/download
+ * @desc 下载文件
+ * @access Private
+ */
+router.get('/files/:id/download', async (req, res) => {
+  try {
+    const userId = 1; // 单用户系统，固定用户ID为1
+    const fileId = parseInt(req.params.id);
+    
+    if (!fileId || isNaN(fileId)) {
+      return res.status(400).json({
+        success: false,
+        message: '无效的文件ID'
+      });
+    }
+    
+    const fileService = new FileService();
+    
+    // 获取文件信息
+    const file = await fileService.getFileById(fileId);
+    if (!file) {
+      return res.status(404).json({
+        success: false,
+        message: '文件不存在'
+      });
+    }
+    
+    // 生成下载链接
+    const downloadUrl = await OssService.getDownloadUrl(file.file_path);
+    
+    // 记录下载日志
+    await fileService.logDownload(fileId, userId);
+    
+    res.json({
+      success: true,
+      data: {
+        download_url: downloadUrl,
+        filename: file.filename,
+        size: file.file_size
+      }
+    });
+  } catch (error) {
+    console.error('获取下载链接失败:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || '获取下载链接失败'
     });
   }
 });
